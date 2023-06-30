@@ -1,13 +1,15 @@
 import os
 import boto3
+import requests
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, validator, HttpUrl
+from pydantic import BaseModel, validator, HttpUrl, ValidationError
 from pyorc import service
 
 # nodeodm specific imports
 import callbacks
+import utils
 
 class Callback(BaseModel):
     func_name: Optional[str] = "get_discharge"  # name of function that establishes the callback json
@@ -17,7 +19,7 @@ class Callback(BaseModel):
     @validator("func_name")
     def name_in_callbacks(cls, v):
         if not(hasattr(callbacks, v)):
-            raise NameError(f"callback {v} not available in callbacks")
+            raise ValueError(f"callback {v} not available in callbacks")
         return v
 
 class InputFile(BaseModel):
@@ -54,31 +56,44 @@ class Subtask(BaseModel):
     @validator("name")
     def name_in_service(cls, v):
         if not(hasattr(service, v)):
-            raise NameError(f"task {v} not available in pyorc.service")
+            raise ValueError(f"task {v} not available in pyorc.service")
         return v
 class CallbackUrl(BaseModel):
     """
     Definition of accessibility to storage and callback locations
     """
-    callback_url: HttpUrl = "https://localhost:8000/api"
-    callback_token: str = "abcdefgh"
+    url: HttpUrl = "https://localhost:8000/api"
+    token: str = "abcdefgh"
+
+    @validator("url")
+    def validate_url(cls, v):
+        try:
+            r = requests.get(
+                v,
+            )
+        except requests.exceptions.ConnectionError as e:
+            raise ValueError(f"Maximum retries on connection {v} reached")
+        if r.status_code == 200:
+            return v
+        else:
+            raise ValueError(f"Connection failed with status code {r.status_code}")
 
 
 class Storage(BaseModel):
-    storage_url: HttpUrl = "http://127.0.0.1:9000"
-    storage_user: str = "admin"
-    storage_password: str = "password"
-    storage_bucket: str = "video"
+    endpoint_url: HttpUrl = "http://127.0.0.1:9000"
+    aws_access_key_id: str = "admin"
+    aws_secret_access_key: str = "password"
+    bucket_name: str = "video"
 
     @property
     def bucket(self):
-        return boto3.resource(
-            "s3",
-            endpoint_url=os.getenv("S3_ENDPOINT_URL"),
-            aws_access_key_id=os.getenv("S3_ACCESS_KEY"),
-            aws_secret_access_key=os.getenv("S3_ACCESS_SECRET"),
-            config=boto3.session.Config(signature_version="s3v4"),
+        return utils.get_bucket(
+            endpoint_url=self.endpoint_url,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+            bucket_name=self.bucket_name,
         )
+
 
 class Task(BaseModel):
     """
@@ -86,6 +101,6 @@ class Task(BaseModel):
     """
     time: datetime = datetime.now()
     callback_url: CallbackUrl = None
-    storage: Storage = None
+    storage: Optional[Storage] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[InputFile] = []  # files that are needed to perform any subtask
