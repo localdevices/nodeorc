@@ -1,0 +1,56 @@
+version: "3.8"
+services:
+  # Python nodeorc application for data processing.
+  mockserver:
+    image: mockserver/mockserver:5.15.0
+    ports:
+      - 1080:1080
+    environment:
+      MOCKSERVER_PROPERTY_FILE: /config/mockserver.properties
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/initializerJson.json
+    volumes:
+      - type: bind
+        source: ./mockserver
+        target: /config
+
+  nodeorc:
+    build: ./nodeorc
+    environment:
+      AMQP_CONNECTION_STRING: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
+      S3_ENDPOINT_URL: "${MINIO_ACCESS_URL}"
+      S3_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      S3_ACCESS_SECRET: "${MINIO_SECRET_KEY}"
+    volumes:
+      - type: bind
+        source: ./nodeorc
+        target: /app
+    depends_on:
+      - storage
+      - rabbitmq
+    restart: always
+
+  # S3 storage application which mimics AWS storage service.
+  storage:
+    image: minio/minio
+    ports:
+      - 9000:9000
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+    volumes:
+      - storage-data:/data
+    command: server /data
+
+  # Message broker for processing queue.
+  rabbitmq:
+    image: rabbitmq:3.8.9-management
+    ports:
+      - 15672:15672
+      - 5672:5672
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+
+# Persistent volume for storage container, not mounted to host OS.
+volumes:
+  storage-data:
