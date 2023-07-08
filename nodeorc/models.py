@@ -27,7 +27,7 @@ class InputFile(BaseModel):
     Definition of the location, naming of raw result on tmp location, and output file name for cloud storage per subtask
     """
     remote_name: str = "video.mp4"
-    tmp_name = "video.mp4"
+    tmp_name: str = "video.mp4"
 
 
 class OutputFile(BaseModel):
