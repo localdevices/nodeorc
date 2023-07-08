@@ -1,0 +1,35 @@
+[
+  {
+    "id": "test",
+    "httpRequest": {
+      "path": "/callback"
+    },
+    "httpResponse": {
+      "body": "some response"
+    }
+  },
+  {
+    "id": "post_discharge",
+    "priority": 0,
+    "httpRequest": {
+      "method": "POST",
+      "path": "/discharge",
+      "body": {
+        "type": "JSON",
+        "json": {
+          "flags": "${json-unit.ignore-element}",
+          "values": "${json-unit.ignore-element}"
+        }
+      }
+    },
+    "httpResponse": {
+      "body": {
+        "type": "JSON",
+        "json": {
+          "msg": "Discharge values received"
+        }
+      }
+    }
+  }
+
+]
