@@ -65,11 +65,6 @@ def upload_file(obj, bucket, dest=None, logger=logging):
     """
     Uploads BytesIO obj representation of data in file 'fn' in bucket
     """
-    # if dest is None:
-    #     dest = os.path.split(os.path.abspath(fn))[1]
-
-    # Create bucket if it doesn't exist yet.
-    # if s3.Bucket(bucket) not in s3.buckets.all():
-    #     s3.create_bucket(Bucket=bucket)
-    bucket.upload_fileobj(obj, dest)
+    r = bucket.upload_fileobj(obj, dest)
     logger.info(f"{bucket}/{dest} created")
+    return r

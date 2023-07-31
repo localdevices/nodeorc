@@ -19,14 +19,15 @@ def s3_video_sample(video_sample_url, storage):
     r = requests.get(video_sample_url)
     obj = BytesIO(r.content)
     print(f"Uploading {video_sample_url}")
-    r = utils.upload_file(obj, storage.bucket[1], dest=filename)
+    r = storage.upload_io(obj, dest=filename)
+    # r = utils.upload_file(obj, storage.bucket[1], dest=filename)
     yield storage.bucket[1], filename
     print(f"Deleting {os.path.split(video_sample_url)[-1]}")
     storage.bucket[1].objects.filter(Prefix=filename).delete()
 
 @pytest.fixture
 def callback_url():
-    return "http://api.globalwaterwatch.earth"
+    return "127.0.0.1:1080"
 
 
 @pytest.fixture

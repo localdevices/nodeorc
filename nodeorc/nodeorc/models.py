@@ -56,6 +56,8 @@ class Storage(BaseModel):
             aws_secret_access_key=self.aws_secret_access_key,
             bucket_name=self.bucket_name,
         )
+    def upload_io(self, obj, dest, **kwargs):
+        utils.upload_file(obj, self.bucket[1], dest=dest, **kwargs)
 
 class InputFile(BaseModel):
     """
