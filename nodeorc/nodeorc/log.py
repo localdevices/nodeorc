@@ -3,7 +3,7 @@ import sys
 import logging
 import logging.handlers
 import os
-from __init__ import __version__
+from nodeorc import __version__
 from datetime import datetime
 
 timestr = datetime.now().strftime("%Y%m%dT%H%M%S")
