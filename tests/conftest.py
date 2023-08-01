@@ -12,6 +12,10 @@ def video_sample_url():
 
 
 @pytest.fixture
+def temp_path():
+    return os.path.abspath("./tmp")
+
+@pytest.fixture
 def s3_video_sample(video_sample_url, storage):
     # upload a video sample to s3 bucket
     filename = os.path.split(video_sample_url)[-1]
@@ -21,9 +25,9 @@ def s3_video_sample(video_sample_url, storage):
     print(f"Uploading {video_sample_url}")
     r = storage.upload_io(obj, dest=filename)
     # r = utils.upload_file(obj, storage.bucket[1], dest=filename)
-    yield storage.bucket[1], filename
+    yield storage, filename
     print(f"Deleting {os.path.split(video_sample_url)[-1]}")
-    storage.bucket[1].objects.filter(Prefix=filename).delete()
+    storage.bucket.objects.filter(Prefix=filename).delete()
 
 @pytest.fixture
 def callback_url():
@@ -66,21 +70,20 @@ def callback():
     return obj
 
 @pytest.fixture
-def input_file(video_sample_url, storage):
+def input_file(s3_video_sample, video_sample_url):
+    storage, filename = s3_video_sample
     video_sample_file = os.path.split(video_sample_url)[-1]
-    obj = models.InputFile(
-        remote_name="video.mp4",
+    obj = models.File(
+        remote_name=filename,
         tmp_name="video.mp4",
-        storage=storage
     )
     return obj
 
 @pytest.fixture
 def output_file(storage):
-    obj = models.OutputFile(
+    obj = models.File(
         remote_name="piv.nc",
         tmp_name="OUTPUT/piv.nc",
-        storage=storage
     )
     return obj
 
@@ -88,7 +91,7 @@ def output_file(storage):
 @pytest.fixture
 def subtask(callback, input_file, output_file):
     obj = models.Subtask(
-        name="VelocityFlowProcessor",
+        name="velocity_flow",
         kwargs={},
         callback=callback,
         input_files={"videofile": input_file},
