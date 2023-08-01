@@ -1,7 +1,6 @@
 import boto3
-import models
-
-
+import os
+import logging
 
 def check_bucket(s3, bucket_name):
     try:
@@ -37,6 +36,7 @@ def get_s3(
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
         config=boto3.session.Config(signature_version="s3v4"),
+        verify=False
     )
 
 
@@ -51,6 +51,9 @@ def get_bucket(
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
     )
+    if s3.Bucket(bucket_name) not in s3.buckets.all():
+        s3.create_bucket(Bucket=bucket_name)
+
     # first check if bucket is available
     r = check_bucket(s3, bucket_name)
     if r["code"] == 200:
@@ -58,3 +61,10 @@ def get_bucket(
     else:
         return r, None
 
+def upload_file(obj, bucket, dest=None, logger=logging):
+    """
+    Uploads BytesIO obj representation of data in file 'fn' in bucket
+    """
+    r = bucket.upload_fileobj(obj, dest)
+    logger.info(f"{bucket}/{dest} created")
+    return r

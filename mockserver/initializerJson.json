@@ -1,11 +1,11 @@
 [
   {
-    "id": "test",
+    "id": "main",
     "httpRequest": {
-      "path": "/callback"
+      "path": ""
     },
     "httpResponse": {
-      "body": "some response"
+      "body": "successful"
     }
   },
   {

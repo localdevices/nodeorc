@@ -1,15 +1,13 @@
-import os
-import boto3
 import requests
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, validator, HttpUrl, ValidationError
+from pydantic import BaseModel, validator, HttpUrl
 from pyorc import service
 
 # nodeodm specific imports
-import callbacks
-import utils
+from nodeorc import callbacks, utils
+
 
 class Callback(BaseModel):
     func_name: Optional[str] = "get_discharge"  # name of function that establishes the callback json
@@ -22,48 +20,13 @@ class Callback(BaseModel):
             raise ValueError(f"callback {v} not available in callbacks")
         return v
 
-class InputFile(BaseModel):
-    """
-    Definition of the location, naming of raw result on tmp location, and output file name for cloud storage per subtask
-    """
-    remote_name: str = "video.mp4"
-    tmp_name: str = "video.mp4"
 
-
-class OutputFile(BaseModel):
-    """
-    Definition of the location, naming of raw result on tmp location, and output file name for cloud storage per subtask
-    """
-    remote_name: str = "piv.nc"
-    tmp_name: str = "OUTPUT/piv.nc"
-
-
-
-class Subtask(BaseModel):
-    """
-    Definition of a subtask with its keyword arguments (connects to pyorc.service level)
-    """
-    name: str = "VelocityFlowProcessor"  # name of subtask to perform (see pyorc.service)
-    kwargs: Dict = {}  # keyword args used for subtask
-    # these files are added as filled in after download in the kwargs
-    callback: Optional[Callback] = None  # callbacks for the subtask (can be multiple)
-    # for files, if key names are in kwargs, then within task handling these can be replaced
-    # expected input files (relative to .tmp location) used as input
-    input_files: Optional[Dict[str, InputFile]] = {}
-    # files that are produced from the subtask (relative to .tmp location) and remote location
-    output_files: Optional[Dict[str, OutputFile]] = {}
-
-    @validator("name")
-    def name_in_service(cls, v):
-        if not(hasattr(service, v)):
-            raise ValueError(f"task {v} not available in pyorc.service")
-        return v
 class CallbackUrl(BaseModel):
     """
     Definition of accessibility to storage and callback locations
     """
-    url: HttpUrl = "https://localhost:8000/api"
-    token: str = "abcdefgh"
+    url: HttpUrl = "https://127.0.0.1:8000/api"
+    token: Optional[str] = "abcdefgh"
 
     @validator("url")
     def validate_url(cls, v):
@@ -88,12 +51,51 @@ class Storage(BaseModel):
     @property
     def bucket(self):
         return utils.get_bucket(
-            endpoint_url=self.endpoint_url,
+            endpoint_url=str(self.endpoint_url),
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
             bucket_name=self.bucket_name,
         )
+    def upload_io(self, obj, dest, **kwargs):
+        utils.upload_file(obj, self.bucket[1], dest=dest, **kwargs)
 
+class InputFile(BaseModel):
+    """
+    Definition of the location, naming of raw result on tmp location, and output file name for cloud storage per subtask
+    """
+    remote_name: str = "video.mp4"
+    tmp_name: str = "video.mp4"
+    storage: Storage
+
+
+class OutputFile(BaseModel):
+    """
+    Definition of the location, naming of raw result on tmp location, and output file name for cloud storage per subtask
+    """
+    remote_name: str = "piv.nc"
+    tmp_name: str = "OUTPUT/piv.nc"
+    storage: Storage
+
+
+class Subtask(BaseModel):
+    """
+    Definition of a subtask with its keyword arguments (connects to pyorc.service level)
+    """
+    name: str = "VelocityFlowProcessor"  # name of subtask to perform (see pyorc.service)
+    kwargs: Dict = {}  # keyword args used for subtask
+    # these files are added as filled in after download in the kwargs
+    callback: Optional[Callback] = None  # callbacks for the subtask (can be multiple)
+    # for files, if key names are in kwargs, then within task handling these can be replaced
+    # expected input files (relative to .tmp location) used as input
+    input_files: Optional[Dict[str, InputFile]] = {}
+    # files that are produced from the subtask (relative to .tmp location) and remote location
+    output_files: Optional[Dict[str, OutputFile]] = {}
+
+    @validator("name")
+    def name_in_service(cls, v):
+        if not(hasattr(service, v)):
+            raise ValueError(f"task {v} not available in pyorc.service")
+        return v
 
 class Task(BaseModel):
     """
@@ -103,4 +105,4 @@ class Task(BaseModel):
     callback_url: CallbackUrl = None
     storage: Optional[Storage] = None
     subtasks: Optional[List[Subtask]] = []
-    input_files: Optional[InputFile] = []  # files that are needed to perform any subtask
+    input_files: Optional[List[InputFile]] = []  # files that are needed to perform any subtask
