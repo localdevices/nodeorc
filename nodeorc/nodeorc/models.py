@@ -5,7 +5,7 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, validator, HttpUrl
+from pydantic import BaseModel, validator, HttpUrl, ConfigDict
 from pyorc import service
 from io import BytesIO
 # nodeodm specific imports
@@ -90,7 +90,7 @@ class Subtask(BaseModel):
             raise ValueError(f"task {v} not available in pyorc.service")
         return v
 
-    def execute(self, storage=None, tmp="."):
+    def execute(self, storage=None, tmp=".", logger=logging):
         """
         Execute the subtask and return outputs to defined storage (if provided)
 
@@ -102,21 +102,21 @@ class Subtask(BaseModel):
         """
         # replace or add kwargs with filename args
         self.replace_kwargs_files(tmp=tmp)
-        self.execute_subtask(**self.kwargs)
+        self.execute_subtask(logger=logger)
         if storage is not None:
-            self.upload_output(storage, tmp)
+            self.upload_outputs(storage, tmp)
 
     def replace_kwargs_files(self, tmp="."):
         # replace only when the keyname is in kwargs
-        for k, v in self.input_files:
+        for k, v in self.input_files.items():
             if k in self.kwargs:
                 self.kwargs[k] = os.path.join(tmp, v.tmp_name)
-        for k, v in self.output_files:
+        for k, v in self.output_files.items():
             if k in self.kwargs:
                 self.kwargs[k] = os.path.join(tmp, v.tmp_name)
 
 
-    def execute_subtask(self):
+    def execute_subtask(self, logger=logging):
         """
         Execute subtask
 
@@ -125,17 +125,19 @@ class Subtask(BaseModel):
 
         """
         # retrieve task name from pyorc service level
+        logger.info(f"Executing task {self.name}")
         task_func = getattr(service, self.name)
-        task_func(**self.kwargs)
+        task_func(**self.kwargs, logger=logger)
 
     def upload_outputs(self, storage, tmp):
-        for k, v in self.output_files:
+        for k, v in self.output_files.items():
             tmp_file = os.path.join(tmp, v.tmp_name)
             # check if file is present
             if not(os.path.isfile(tmp_file)):
                 raise FileNotFoundError(f"Temporary file {tmp_file} was not created by subtask")
-            with open(tmp_file, "r") as f:
+            with open(tmp_file, "rb") as f:
                 obj = BytesIO(f.read())
+            obj.seek(0)
             storage.upload_io(obj, dest=v.remote_name)
 
 
@@ -147,11 +149,18 @@ class Task(BaseModel):
     id: str = uuid.uuid4()
     time: datetime = datetime.now()
     callback_url: CallbackUrl = None
+    callback_endpoint_error: str = "/processing/examplevideo/error"
+    callback_endpoint_success: str = "/processing/examplevideo/complete"
     storage: Optional[Storage] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[List[File]] = []  # files that are needed to perform any subtask
+    logger: logging.Logger = logging
 
-    def execute(self, tmp, logger=logging):
+    class Config:
+        arbitrary_types_allowed = True
+
+
+    def execute(self, tmp):
         """
         Execute the entire task logic
 
@@ -163,15 +172,18 @@ class Task(BaseModel):
         -------
 
         """
+        # prepare tmp location
+        if not(os.path.isdir(tmp)):
+            os.makedirs(tmp)
         # first download the input files
-        logger.info(f"Performing task defined at {self.time} with id {self.id}")
-        print(f"Downloading all inputs to {tmp}")
+        self.logger.info(f"Performing task defined at {self.time} with id {self.id}")
+        self.logger.info(f"Downloading all inputs to {tmp}")
         self.download_input(tmp)
         # then perform all subtasks in order, upload occur within the subtasks
-        logger.info(f"Executing subtasks")
-        # self.execute_subtasks()
+        self.logger.info(f"Executing subtasks")
+        self.execute_subtasks(tmp)
         # clean up the temp location
-        logger.info(f"Removing temporary files")
+        self.logger.info(f"Removing temporary files")
         # shutil.rmtree(tmp)
         # TODO: perform the final callback
         # self.callback()
@@ -195,10 +207,10 @@ class Task(BaseModel):
             self.storage.bucket.download_file(file.remote_name, trg)
 
 
-    def execute_subtasks(self):
+    def execute_subtasks(self, tmp):
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
-            subtask.execute(storage=self.storage)
+            subtask.execute(storage=self.storage, tmp=tmp, logger=self.logger)
 
     def callback(self):
         raise NotImplementedError

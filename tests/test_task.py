@@ -1,4 +1,4 @@
-from nodeorc import tasks
+from nodeorc import log
 
 def test_velocity_flow(task, temp_path):
 
