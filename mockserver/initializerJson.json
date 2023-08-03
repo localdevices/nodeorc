@@ -1,19 +1,10 @@
 [
   {
-    "id": "main",
-    "httpRequest": {
-      "path": ""
-    },
-    "httpResponse": {
-      "body": "successful"
-    }
-  },
-  {
     "id": "post_discharge",
     "priority": 0,
     "httpRequest": {
       "method": "POST",
-      "path": "/discharge",
+      "path": "/processing/examplevideo/discharge",
       "body": {
         "type": "JSON",
         "json": {
@@ -30,6 +21,53 @@
         }
       }
     }
+  },
+  {
+    "id": "post_error",
+    "priority": 0,
+    "httpRequest": {
+      "method": "POST",
+      "path": "/processing/examplevideo/error",
+      "body": {
+        "type": "JSON",
+        "json": {
+          "error": "${json-unit.ignore-element}"
+        }
+      }
+    },
+    "httpResponse": {
+      "statusCode": 500,
+      "body": {
+        "type": "JSON",
+        "json": {
+          "msg": "some error occurred, please check the logs of the node",
+        }
+      }
+    }
+  },
+  {
+    "id": "post_complete",
+    "priority": 0,
+    "httpRequest": {
+      "method": "POST",
+      "path": "/processing/examplevideo/complete",
+      "body": {
+        "type": "JSON",
+        "json": {
+          "msg": "${json-unit.ignore-element}"
+        }
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "body": {
+        "type": "JSON",
+        "json": {
+          "msg": "Task completed",
+        }
+      }
+    }
   }
+
 
 ]
