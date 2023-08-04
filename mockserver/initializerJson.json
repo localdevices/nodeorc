@@ -8,8 +8,8 @@
       "body": {
         "type": "JSON",
         "json": {
-          "flags": "${json-unit.ignore-element}",
-          "values": "${json-unit.ignore-element}"
+          "values": "${json-unit.ignore-element}",
+          "perc_measured": "${json-unit.ignore-element}"
         }
       }
     },

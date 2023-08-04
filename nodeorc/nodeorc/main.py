@@ -10,17 +10,17 @@ logger = log.start_logger(True, False)
 def process(ch, method, properties, body):
     task_dict = json.loads(body.decode("utf-8"))
     # validate callback url
-    if "callback_url" in task_dict:
-        # test if url is functioning
-        try:
-            # validate url
-            callback_url = models.CallbackUrl(**body["callback_url"])
-        except ValidationError as exc:
-            logger.error(f"{exc.errors()[0]['type']}: {exc.errors()[0]['msg']}")
-    else:
-        msg = "AMQP message body does not contain callback_url"
-        logger.error(msg)
-        raise ValueError(msg)
+    # if "callback_url" in task_dict:
+    #     # test if url is functioning
+    #     try:
+    #         # validate url
+    #         callback_url = models.CallbackUrl(**body["callback_url"])
+    #     except ValidationError as exc:
+    #         logger.error(f"{exc.errors()[0]['type']}: {exc.errors()[0]['msg']}")
+    # else:
+    #     msg = "AMQP message body does not contain callback_url"
+    #     logger.error(msg)
+    #     raise ValueError(msg)
     # validate message body entirely
     try:
         task = models.task(**task_dict)

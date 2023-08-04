@@ -107,7 +107,7 @@ def callback():
     obj = models.Callback(
         func_name="post_discharge",
         kwargs={},
-        url_subpath="http://127.0.0.1:1080/discharge"  # used to extend the default callback url
+        callback_endpoint="/processing/examplevideo/discharge"  # used to extend the default callback url
     )
     return obj
 
@@ -140,13 +140,22 @@ def output_file(storage):
 
 
 @pytest.fixture
-def subtask(callback, input_file, output_file, kwargs_piv):
+def output_file_cs(storage):
+    obj = models.File(
+        remote_name="transect_transect_1.nc",
+        tmp_name="OUTPUT/transect_transect_1.nc",
+    )
+    return obj
+
+
+@pytest.fixture
+def subtask(callback, input_file, output_file, output_file_cs, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
         callback=callback,
         input_files={"videofile": input_file},
-        output_files={"piv": output_file}
+        output_files={"piv": output_file, "transect": output_file_cs}
     )
     return obj
 

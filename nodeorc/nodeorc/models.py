@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import requests
@@ -13,9 +14,9 @@ from nodeorc import callbacks, utils
 
 
 class Callback(BaseModel):
-    func_name: Optional[str] = "get_discharge"  # name of function that establishes the callback json
+    func_name: Optional[str] = "post_discharge"  # name of function that establishes the callback json
     kwargs: Optional[Dict[str, Any]] = {}
-    url_subpath: Optional[HttpUrl] = "http://localhost:8000/api"  # used to extend the default callback url
+    callback_endpoint: Optional[str] = "/example"  # used to extend the default callback url
 
     @validator("func_name")
     def name_in_callbacks(cls, v):
@@ -39,10 +40,7 @@ class CallbackUrl(BaseModel):
             )
         except requests.exceptions.ConnectionError as e:
             raise ValueError(f"Maximum retries on connection {v} reached")
-        if r.status_code == 200:
-            return v
-        else:
-            raise ValueError(f"Connection failed with status code {r.status_code}")
+        return v
 
 
 class Storage(BaseModel):
@@ -90,7 +88,7 @@ class Subtask(BaseModel):
             raise ValueError(f"task {v} not available in pyorc.service")
         return v
 
-    def execute(self, storage=None, tmp=".", logger=logging):
+    def execute(self, storage=None, tmp=".", base_url="http://localhost:8000", logger=logging):
         """
         Execute the subtask and return outputs to defined storage (if provided)
 
@@ -105,7 +103,8 @@ class Subtask(BaseModel):
         self.execute_subtask(logger=logger)
         if storage is not None:
             self.upload_outputs(storage, tmp)
-
+        if self.callback is not None:
+            self.execute_callback(base_url, tmp=tmp)
     def replace_kwargs_files(self, tmp="."):
         # replace only when the keyname is in kwargs
         for k, v in self.input_files.items():
@@ -141,16 +140,27 @@ class Subtask(BaseModel):
             storage.upload_io(obj, dest=v.remote_name)
 
 
+    def execute_callback(self, base_url, tmp):
+        # get the name of callback
+        func = getattr(callbacks, self.callback.func_name)
+        # call the callback function with the output files as input, this is a standardized approach
+        msg = func(self.output_files, tmp=tmp)
+        url = str(base_url) + self.callback.callback_endpoint
+        # perform callback
+        requests.post(url, json=msg) #json.dumps(msg))
+
+
+
 
 class Task(BaseModel):
     """
     Definition of an entire task
     """
-    id: str = uuid.uuid4()
+    id: str = str(uuid.uuid4())
     time: datetime = datetime.now()
-    callback_url: CallbackUrl = None
+    callback_url: CallbackUrl
     callback_endpoint_error: str = "/processing/examplevideo/error"
-    callback_endpoint_success: str = "/processing/examplevideo/complete"
+    callback_endpoint_complete: str = "/processing/examplevideo/complete"
     storage: Optional[Storage] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[List[File]] = []  # files that are needed to perform any subtask
@@ -176,18 +186,24 @@ class Task(BaseModel):
         if not(os.path.isdir(tmp)):
             os.makedirs(tmp)
         # first download the input files
-        self.logger.info(f"Performing task defined at {self.time} with id {self.id}")
-        self.logger.info(f"Downloading all inputs to {tmp}")
-        self.download_input(tmp)
-        # then perform all subtasks in order, upload occur within the subtasks
-        self.logger.info(f"Executing subtasks")
-        self.execute_subtasks(tmp)
-        # clean up the temp location
-        self.logger.info(f"Removing temporary files")
-        # shutil.rmtree(tmp)
-        # TODO: perform the final callback
-        # self.callback()
-
+        try:
+            self.logger.info(f"Performing task defined at {self.time} with id {self.id}")
+            self.logger.info(f"Downloading all inputs to {tmp}")
+            self.download_input(tmp)
+            # then perform all subtasks in order, upload occur within the subtasks
+            self.logger.info(f"Executing subtasks")
+            self.execute_subtasks(tmp)
+            # clean up the temp location
+            self.logger.info(f"Removing temporary files")
+            shutil.rmtree(tmp)
+            r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
+        except BaseException as e:
+            r = self.callback_error(msg=str(e))
+        if r.status_code == 200:
+            self.logger.info(f"Task id {str(self.id)} completed")
+        else:
+            self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code}")
+            raise Exception("Error detected, restarting node")
 
     def download_input(self, tmp):
         """
@@ -195,10 +211,8 @@ class Task(BaseModel):
 
         Parameters
         ----------
-        tmp
-
-        Returns
-        -------
+        tmp : str
+            path to temporary local file store
 
         """
         for file in self.input_files:
@@ -208,9 +222,47 @@ class Task(BaseModel):
 
 
     def execute_subtasks(self, tmp):
+        """
+
+        Parameters
+        ----------
+        tmp : str
+            path to temporary local file store
+
+        """
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
-            subtask.execute(storage=self.storage, tmp=tmp, logger=self.logger)
+            subtask.execute(storage=self.storage, tmp=tmp, base_url=self.callback_url.url, logger=self.logger)
 
-    def callback(self):
-        raise NotImplementedError
+    def callback_error(self, msg):
+        """
+        Perform callback in case an error is received
+
+        Parameters
+        ----------
+        msg : str
+            message to pass
+
+        Returns
+        -------
+
+        r : requests.response
+        """
+        url = self.callback_url.url + self.callback_endpoint_error
+        r = requests.post(
+            url,
+            json={
+                "error": msg
+            }
+        )
+        return r
+
+    def callback_complete(self, msg):
+        url = self.callback_url.url + self.callback_endpoint_complete
+        r = requests.post(
+            url,
+            json={
+                "msg": msg
+            }
+        )
+        return r
