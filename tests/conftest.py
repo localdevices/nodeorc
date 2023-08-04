@@ -1,5 +1,6 @@
 import json
 import os
+import pika
 import pyorc
 import pytest
 import requests
@@ -33,6 +34,18 @@ def camconfig(camconfig_url):
     r = requests.get(camconfig_url)
     return r.json()
 
+@pytest.fixture
+def channel():
+    connection = pika.BlockingConnection(
+        pika.URLParameters(
+            "amqp://admin:password@localhost:5672"
+        )
+    )
+    channel = connection.channel()
+    channel.queue_declare(queue="processing")
+    yield channel
+    connection.close()
+
 
 @pytest.fixture
 def recipe(recipe_url, temp_path):
@@ -55,7 +68,7 @@ def logger():
 
 @pytest.fixture
 def temp_path():
-    return os.path.abspath("./tmp")
+    return "./tmp"
 
 @pytest.fixture
 def s3_video_sample(video_sample_url, crossection_url, storage):
@@ -75,12 +88,8 @@ def s3_video_sample(video_sample_url, crossection_url, storage):
     r = storage.upload_io(obj, dest=filename_cs)
 
     yield storage, filename, filename_cs
-    print(f"Deleting {os.path.split(video_sample_url)[-1]}")
-    storage.bucket.objects.filter(Prefix=filename).delete()
-
-@pytest.fixture
-def callback_url():
-    return "127.0.0.1:1080"
+    # print(f"Deleting {os.path.split(video_sample_url)[-1]}")
+    # storage.bucket.objects.filter(Prefix=filename).delete()
 
 
 @pytest.fixture
@@ -93,6 +102,17 @@ def storage():
     )
     return obj
 
+@pytest.fixture
+def storage_amqp():
+    obj = models.Storage(
+        endpoint_url="http://storage.com:9000",
+        aws_access_key_id="admin",
+        aws_secret_access_key="password",
+        bucket_name="examplevideo"
+    )
+    return obj
+
+
 
 @pytest.fixture
 def callback_url():
@@ -101,6 +121,16 @@ def callback_url():
         token=None
     )
     return obj
+
+@pytest.fixture
+def callback_url_amqp():
+    obj = models.CallbackUrl(
+        url="http://mockserver:1080",
+        token=None
+    )
+    return obj
+
+
 
 @pytest.fixture
 def callback():
@@ -179,6 +209,20 @@ def task(callback_url, storage, subtask, input_file, input_file_cs, logger):
         time=datetime.now(),
         callback_url=callback_url,
         storage=storage,
+        subtasks=[subtask],
+        input_files=[input_file, input_file_cs],
+        logger=logger
+        # files that are needed to perform any subtask
+    )
+    return obj
+
+
+@pytest.fixture
+def task_amqp(callback_url_amqp, storage_amqp, subtask, input_file, input_file_cs, logger):
+    obj = models.Task(
+        time=datetime.now(),
+        callback_url=callback_url_amqp,
+        storage=storage_amqp,
         subtasks=[subtask],
         input_files=[input_file, input_file_cs],
         logger=logger

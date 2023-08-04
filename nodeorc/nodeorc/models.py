@@ -6,11 +6,12 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, validator, HttpUrl, ConfigDict
+from pydantic import BaseModel, validator, AnyHttpUrl, ConfigDict
 from pyorc import service
 from io import BytesIO
 # nodeodm specific imports
 from nodeorc import callbacks, utils
+from urllib.parse import urljoin
 
 
 class Callback(BaseModel):
@@ -29,7 +30,7 @@ class CallbackUrl(BaseModel):
     """
     Definition of accessibility to storage and callback locations
     """
-    url: HttpUrl = "https://127.0.0.1:8000/api"
+    url: AnyHttpUrl = "https://127.0.0.1:8000/api"
     token: Optional[str] = "abcdefgh"
 
     @validator("url")
@@ -44,7 +45,7 @@ class CallbackUrl(BaseModel):
 
 
 class Storage(BaseModel):
-    endpoint_url: HttpUrl = "http://127.0.0.1:9000"
+    endpoint_url: AnyHttpUrl = "http://127.0.0.1:9000"
     aws_access_key_id: str = "admin"
     aws_secret_access_key: str = "password"
     bucket_name: str = "video"
@@ -105,6 +106,8 @@ class Subtask(BaseModel):
             self.upload_outputs(storage, tmp)
         if self.callback is not None:
             self.execute_callback(base_url, tmp=tmp)
+
+
     def replace_kwargs_files(self, tmp="."):
         # replace only when the keyname is in kwargs
         for k, v in self.input_files.items():
@@ -145,7 +148,7 @@ class Subtask(BaseModel):
         func = getattr(callbacks, self.callback.func_name)
         # call the callback function with the output files as input, this is a standardized approach
         msg = func(self.output_files, tmp=tmp)
-        url = str(base_url) + self.callback.callback_endpoint
+        url = urljoin(str(base_url), self.callback.callback_endpoint)
         # perform callback
         requests.post(url, json=msg) #json.dumps(msg))
 
@@ -193,10 +196,10 @@ class Task(BaseModel):
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
             self.execute_subtasks(tmp)
-            # clean up the temp location
             self.logger.info(f"Removing temporary files")
-            shutil.rmtree(tmp)
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
+            # clean up the temp location
+            shutil.rmtree(tmp)
         except BaseException as e:
             r = self.callback_error(msg=str(e))
         if r.status_code == 200:
@@ -248,7 +251,7 @@ class Task(BaseModel):
 
         r : requests.response
         """
-        url = self.callback_url.url + self.callback_endpoint_error
+        url = urljoin(str(self.callback_url.url), self.callback_endpoint_error)
         r = requests.post(
             url,
             json={
@@ -258,7 +261,7 @@ class Task(BaseModel):
         return r
 
     def callback_complete(self, msg):
-        url = self.callback_url.url + self.callback_endpoint_complete
+        url = urljoin(str(self.callback_url.url), self.callback_endpoint_complete)
         r = requests.post(
             url,
             json={

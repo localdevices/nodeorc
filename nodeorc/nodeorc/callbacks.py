@@ -16,12 +16,11 @@ def post_discharge(output_files, tmp="."):
         perc_measured = Q_nofill / Q * 100  # fraction that is truly measured compared to total
     else:
         perc_measured = np.nan * Q
+    # make a json message
     msg = {
         "values": list(Q),
         "perc_measured": list(perc_measured)
     }
-    print(f"CALLBACK: {msg}")
-    # make a json message
     return msg
 
 def post_file_not_found(base_url, endpoint, task, fn, logger=logger):

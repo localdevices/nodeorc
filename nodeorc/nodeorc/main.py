@@ -2,53 +2,24 @@ import pika
 import traceback
 import os
 import json
-from . import log, models, tasks
+from nodeorc import log, models, tasks
 from pydantic import ValidationError
 logger = log.start_logger(True, False)
 
+temp_path = os.getenv("TEMP_PATH", "./tmp")
 # Callback function for each process task that is queued.
 def process(ch, method, properties, body):
     task_dict = json.loads(body.decode("utf-8"))
-    # validate callback url
-    # if "callback_url" in task_dict:
-    #     # test if url is functioning
-    #     try:
-    #         # validate url
-    #         callback_url = models.CallbackUrl(**body["callback_url"])
-    #     except ValidationError as exc:
-    #         logger.error(f"{exc.errors()[0]['type']}: {exc.errors()[0]['msg']}")
-    # else:
-    #     msg = "AMQP message body does not contain callback_url"
-    #     logger.error(msg)
-    #     raise ValueError(msg)
-    # validate message body entirely
     try:
-        task = models.task(**task_dict)
+        task = models.Task(**task_dict)
+        task.logger = logger
     except ValidationError as exc:
         logger.error(f"{exc.errors()[0]['type']}: {exc.errors()[0]['msg']}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        raise ValidationError("Task not valid, restarting node...")
     # execute the task
-    execute_task(task, logger)
-
-        # try:
-    #     perform_task(**kwargs, logger=logger)
-    #     logger.info(f"Task {task_name} was successful")
-    #     # Acknowledge queue item at end of task.
+    task.execute(temp_path)
     ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    #     r = 200
-    # except BaseException as e:
-    #     logger.error(f"{task_name} failed with error {e}")
-    #     # Acknowledge queue item at end of task.
-    #     ch.basic_ack(delivery_tag=method.delivery_tag)
-    #     # requests.post(
-    #     #     "{}/processing/error/{}".format(os.getenv("ORC_API_URL"), taskInput["kwargs"]["movie"]["id"]),
-    #     #     json={"error_message": str(e)},
-    #     # )
-    #     r = 500
-    #
-    # except Exception as e:
-    #     print("Processing failed with error: %s" % str(e))
-    #     traceback.print_tb(e.__traceback__)
 
 def main():
     connection = pika.BlockingConnection(
@@ -64,7 +35,7 @@ def main():
         logger.info("Start listening for processing tasks in queue.")
         channel.start_consuming()
     except Exception as e:
-        logger.error("Reboot service due to error: %s" % str(e))
+        logger.error("Reboot service: %s" % str(e))
         channel.stop_consuming()
         connection.close()
         traceback.print_tb(e.__traceback__)
