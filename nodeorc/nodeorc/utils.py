@@ -57,9 +57,9 @@ def get_bucket(
     # first check if bucket is available
     r = check_bucket(s3, bucket_name)
     if r["code"] == 200:
-        return r, s3.Bucket(bucket_name)
+        return s3.Bucket(bucket_name)
     else:
-        return r, None
+        return None
 
 def upload_file(obj, bucket, dest=None, logger=logging):
     """
