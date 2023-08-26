@@ -14,7 +14,7 @@ services:
         target: /config
 
   nodeorc:
-    build: ./nodeorc
+    build: .
     environment:
       AMQP_CONNECTION_STRING: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
       S3_ENDPOINT_URL: "${MINIO_ACCESS_URL}"
@@ -22,7 +22,7 @@ services:
       S3_ACCESS_SECRET: "${MINIO_SECRET_KEY}"
     volumes:
       - type: bind
-        source: ./nodeorc
+        source: .
         target: /app
     depends_on:
       - storage
