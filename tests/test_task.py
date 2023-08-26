@@ -14,7 +14,8 @@ def test_velocity_flow(task, temp_path):
     #     # callbacks = [callback]
     # )
     task.execute(temp_path)
-    # forward the task to the processor
+    # forward the task to the
+    # processor
     # except ValidationError as exc:
     #     # TODO: perform callback
     #     print(repr(exc.errors()[0]))
