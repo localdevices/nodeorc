@@ -5,19 +5,22 @@ import requests
 import shutil
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, validator, AnyHttpUrl, ConfigDict
+from typing import List, Optional, Dict, Any, AnyStr
+from pydantic import BaseModel, validator, AnyHttpUrl, ConfigDict, model_validator
 from pyorc import service
 from io import BytesIO
 # nodeodm specific imports
 from nodeorc import callbacks, utils
 from urllib.parse import urljoin
 
+failed_path = os.getenv("FAILED_PATH")
+success_path = os.getenv("SUCCESS_PATH")
 
 class Callback(BaseModel):
-    func_name: Optional[str] = "post_discharge"  # name of function that establishes the callback json
+    func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
+    request_type: str = "POST"
     kwargs: Optional[Dict[str, Any]] = {}
-    callback_endpoint: Optional[str] = "/example"  # used to extend the default callback url
+    callback_endpoint: Optional[str] = "/timeseries"  # used to extend the default callback url
 
     @validator("func_name")
     def name_in_callbacks(cls, v):
@@ -26,12 +29,15 @@ class Callback(BaseModel):
         return v
 
 
+
 class CallbackUrl(BaseModel):
     """
     Definition of accessibility to storage and callback locations
     """
     url: AnyHttpUrl = "https://127.0.0.1:8000/api"
-    token: Optional[str] = "abcdefgh"
+    token_refresh_end_point: Optional[str] = "/token/refresh"
+    refresh_token: Optional[str] = None
+    token: Optional[str] = None
 
     @validator("url")
     def validate_url(cls, v):
@@ -43,23 +49,112 @@ class CallbackUrl(BaseModel):
             raise ValueError(f"Maximum retries on connection {v} reached")
         return v
 
+    @model_validator(mode="before")
+    def replace_token(self):
+        """
+        Checks if the token has expired, and replaces it upon creating this instance
+
+        Returns
+        -------
+
+        """
+        if self.get("refresh_token"):
+            # ensure you have a fresh token before continuing
+            url = self.url + self.token_refresh_endpoint
+            body = {"refresh": self.refresh_token}
+            r = requests.post(url, json=body)
+            self.token = r.json()["access"]
+
 
 class Storage(BaseModel):
-    endpoint_url: AnyHttpUrl = "http://127.0.0.1:9000"
-    aws_access_key_id: str = "admin"
-    aws_secret_access_key: str = "password"
+    url: str = "./tmp"
     bucket_name: str = "video"
 
     @property
     def bucket(self):
-        return utils.get_bucket(
-            endpoint_url=str(self.endpoint_url),
-            aws_access_key_id=self.aws_access_key_id,
-            aws_secret_access_key=self.aws_secret_access_key,
-            bucket_name=self.bucket_name,
+        return os.path.join(self.url, self.bucket_name)
+
+    @property
+    def delete(self):
+        shutil.rmtree(self.bucket)
+
+    def upload_io(self, obj, dest):
+        """
+        Upload a BytesIO object to a file on storage location
+
+        Parameters
+        ----------
+        obj : io.BytesIO
+            bytes to be written to file
+        dest : str
+            destination filename (only name, full path is formed from self.bucket)
+
+        Returns
+        -------
+
+        """
+        obj.seek(0)
+        fn = os.path.join(self.bucket, dest)
+        if not(os.path.isdir(os.path.basename(fn))):
+            os.makedirs(os.path.basename(fn))
+        # create file
+        with open(fn, "wb") as f:
+            f.write(obj.read())
+
+    def download_file(self, filename, trg):
+        """
+        Download file from one local location to another target file (entire path inc. filename)
+
+        Parameters
+        ----------
+        filename : str
+            file within local bucket
+
+        trg : file as it should be named locally
+
+        Returns
+        -------
+
+        """
+        shutil.copyfile(
+            os.path.join(self.bucket, filename),
+            trg
         )
+
+class S3Storage(Storage):
+    url: AnyHttpUrl = "http://127.0.0.1:9000"
+    options: Dict[str, Any]
+
+
+    @property
+    def bucket(self):
+        return utils.get_bucket(
+            url=str(self.url),
+            bucket_name=self.bucket_name,
+            **self.options
+        )
+
     def upload_io(self, obj, dest, **kwargs):
-        utils.upload_file(obj, self.bucket, dest=dest, **kwargs)
+        utils.upload_io(obj, self.bucket, dest=dest, **kwargs)
+
+    def download_file(self, filename, trg):
+        """
+        Download file from bucket to specified target file (entire path inc. filename)
+
+        Parameters
+        ----------
+        filename : str
+            file within bucket
+
+        trg : file as it should be named locally
+
+        Returns
+        -------
+
+        """
+        self.bucket.download_file(filename, trg)
+
+
 
 class File(BaseModel):
     """
@@ -68,6 +163,24 @@ class File(BaseModel):
     remote_name: str = "video.mp4"
     tmp_name: str = "video.mp4"
 
+    def move(self, src, trg):
+        """
+        Moves the file from src folder to trg folder
+
+        Parameters
+        ----------
+        src : str
+            Source folder, where File is expected as tmp file
+        trg :
+            Target folder, where File must be moved to
+
+        Returns
+        -------
+
+        """
+        src_fn = os.path.join(src, self.tmp_name)
+        trg_fn = os.path.join(trg, self.tmp_name)
+        os.rename(src_fn, trg_fn)
 
 class Subtask(BaseModel):
     """
@@ -89,7 +202,7 @@ class Subtask(BaseModel):
             raise ValueError(f"task {v} not available in pyorc.service")
         return v
 
-    def execute(self, storage=None, tmp=".", base_url="http://localhost:8000", logger=logging):
+    def execute(self, storage=None, tmp=".", callback_url=None, logger=logging):
         """
         Execute the subtask and return outputs to defined storage (if provided)
 
@@ -104,8 +217,8 @@ class Subtask(BaseModel):
         self.execute_subtask(logger=logger)
         if storage is not None:
             self.upload_outputs(storage, tmp)
-        if self.callback is not None:
-            self.execute_callback(base_url, tmp=tmp)
+        if self.callback and callback_url:
+            self.execute_callback(callback_url, tmp=tmp)
 
 
     def replace_kwargs_files(self, tmp="."):
@@ -132,6 +245,19 @@ class Subtask(BaseModel):
         task_func(**self.kwargs, logger=logger)
 
     def upload_outputs(self, storage, tmp):
+        """
+        Uploads results from subtask to bucket identified in storage
+
+        Parameters
+        ----------
+        storage : Storage
+            referring to bucket where results should be posted
+        tmp : temporary file location where outputs are expected
+
+        Returns
+        -------
+
+        """
         for k, v in self.output_files.items():
             tmp_file = os.path.join(tmp, v.tmp_name)
             # check if file is present
@@ -143,14 +269,30 @@ class Subtask(BaseModel):
             storage.upload_io(obj, dest=v.remote_name)
 
 
-    def execute_callback(self, base_url, tmp):
+    def execute_callback(self, callback_url, tmp):
         # get the name of callback
         func = getattr(callbacks, self.callback.func_name)
+        # get the type of request. Typically this is POST for an entirely new time series record created from an edge
+        # device, and PATCH for an existing record that must be provided with analyzed flows
+        request = getattr(
+            requests,
+            self.callback.request_type.lower()
+        )
         # call the callback function with the output files as input, this is a standardized approach
+        # prepare headers with the token
+        if callback_url.token:
+            headers = {"Authorization": f"Bearer {callback_url.token}"}
+        else:
+            headers = {}
         msg = func(self.output_files, tmp=tmp)
-        url = urljoin(str(base_url), self.callback.callback_endpoint)
-        # perform callback
-        requests.post(url, json=msg) #json.dumps(msg))
+        url = urljoin(str(callback_url.url), self.callback.callback_endpoint)
+        # perform callback (arrange the adding of token)
+        request(
+            url,
+            json=msg,
+            headers=headers
+        ) #json.dumps(msg))
+
 
 
 
@@ -198,10 +340,21 @@ class Task(BaseModel):
             self.execute_subtasks(tmp)
             self.logger.info(f"Removing temporary files")
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
-            # clean up the temp location
-            shutil.rmtree(tmp)
+            # if the video was treated successfully, then we may move it to a location of interest if wanted
+            if success_path:
+                # move the video
+                [input_file.move(tmp, success_path) for input_file in self.input_files]
+
         except BaseException as e:
             r = self.callback_error(msg=str(e))
+            if failed_path:
+                # we move the non-succeeded video to a separate path for inspection
+                [input_file.move(tmp, failed_path) for input_file in self.input_files]
+
+        # clean up the temp location
+        shutil.rmtree(tmp)
+
+        # report success or error
         if r.status_code == 200:
             self.logger.info(f"Task id {str(self.id)} completed")
         else:
@@ -221,7 +374,8 @@ class Task(BaseModel):
         for file in self.input_files:
             trg = os.path.join(tmp, file.tmp_name)
             # put the input file on tmp location
-            self.storage.bucket.download_file(file.remote_name, trg)
+            self.storage.download_file(file.remote_name, trg)
+            # self.storage.bucket.download_file(file.remote_name, trg)
 
 
     def execute_subtasks(self, tmp):
@@ -235,7 +389,7 @@ class Task(BaseModel):
         """
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
-            subtask.execute(storage=self.storage, tmp=tmp, base_url=self.callback_url.url, logger=self.logger)
+            subtask.execute(storage=self.storage, tmp=tmp, callback_url=self.callback_url, logger=self.logger)
 
     def callback_error(self, msg):
         """

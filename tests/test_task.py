@@ -21,3 +21,6 @@ def test_velocity_flow(task, temp_path):
     #     print(repr(exc.errors()[0]))
 
 
+
+def test_velocity_flow(task_local, temp_path):
+    task_local.execute(temp_path)

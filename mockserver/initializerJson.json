@@ -4,12 +4,17 @@
     "priority": 0,
     "httpRequest": {
       "method": "POST",
-      "path": "/processing/examplevideo/discharge",
+      "path": "/api/timeseries/",
       "body": {
         "type": "JSON",
         "json": {
-          "values": "${json-unit.ignore-element}",
-          "perc_measured": "${json-unit.ignore-element}"
+          "h": "${json-unit.ignore-element}",
+          "q_05": "${json-unit.ignore-element}",
+          "q_25": "${json-unit.ignore-element}",
+          "q_50": "${json-unit.ignore-element}",
+          "q_75": "${json-unit.ignore-element}",
+          "q_95": "${json-unit.ignore-element}",
+          "fraction_velocimetry": "${json-unit.ignore-element}"
         }
       }
     },
@@ -18,6 +23,33 @@
         "type": "JSON",
         "json": {
           "msg": "Discharge values received"
+        }
+      }
+    }
+  },
+  {
+    "id": "post_discharge",
+    "priority": 0,
+    "httpRequest": {
+      "method": "PATCH",
+      "path": "/api/timeseries/1",
+      "body": {
+        "type": "JSON",
+        "json": {
+          "q_05": "${json-unit.ignore-element}",
+          "q_25": "${json-unit.ignore-element}",
+          "q_50": "${json-unit.ignore-element}",
+          "q_75": "${json-unit.ignore-element}",
+          "q_95": "${json-unit.ignore-element}",
+          "fraction_velocimetry": "${json-unit.ignore-element}"
+        }
+      }
+    },
+    "httpResponse": {
+      "body": {
+        "type": "JSON",
+        "json": {
+          "msg": "Time series record updated"
         }
       }
     }

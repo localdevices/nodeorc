@@ -29,7 +29,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "nodeorc = nodeorc.main:main"
+            "nodeorc = nodeorc.main:cli"
         ]
     },
 
