@@ -163,7 +163,7 @@ def callback():
     obj = models.Callback(
         func_name="discharge",
         kwargs={},
-        callback_endpoint="/timeseries"  # used to extend the default callback url
+        endpoint="/api/timeseries/"  # used to extend the default callback url
     )
     return obj
 
@@ -198,7 +198,7 @@ def input_file_local(local_video_sample):
 
 @pytest.fixture
 def input_file_cs_local(local_video_sample, crossection_url):
-    storage, filename, filename_cs = s3_video_sample
+    storage, filename, filename_cs = local_video_sample
     obj = models.File(
         remote_name=filename_cs,
         tmp_name="crosssection.geojson",
@@ -237,6 +237,18 @@ def subtask(callback, input_file, output_file, output_file_cs, kwargs_piv):
 
 
 @pytest.fixture
+def subtask_local(callback, input_file_local, output_file, output_file_cs, kwargs_piv):
+    obj = models.Subtask(
+        name="velocity_flow",
+        kwargs=kwargs_piv,
+        callback=callback,
+        input_files={"videofile": input_file_local},
+        output_files={"piv": output_file, "transect": output_file_cs}
+    )
+    return obj
+
+
+@pytest.fixture
 def kwargs_piv(camconfig, recipe, temp_path):
     kwargs = {
         "videofile": "video.mp4",
@@ -263,12 +275,12 @@ def task(callback_url, s3storage, subtask, input_file, input_file_cs, logger):
     return obj
 
 @pytest.fixture
-def task_local(callback_url, storage, subtask, input_file_local, input_file_cs_local, logger):
+def task_local(callback_url, storage, subtask_local, input_file_local, input_file_cs_local, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=storage,
-        subtasks=[subtask],
+        subtasks=[subtask_local],
         input_files=[input_file_local, input_file_cs_local],
         logger=logger
         # files that are needed to perform any subtask

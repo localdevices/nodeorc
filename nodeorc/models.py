@@ -6,7 +6,7 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any, AnyStr
-from pydantic import BaseModel, validator, AnyHttpUrl, ConfigDict, model_validator
+from pydantic import field_validator, BaseModel, AnyHttpUrl, ConfigDict, model_validator
 from pyorc import service
 from io import BytesIO
 # nodeodm specific imports
@@ -20,9 +20,10 @@ class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
     request_type: str = "POST"
     kwargs: Optional[Dict[str, Any]] = {}
-    callback_endpoint: Optional[str] = "/timeseries"  # used to extend the default callback url
+    endpoint: Optional[str] = "/api/timeseries/"  # used to extend the default callback url
 
-    @validator("func_name")
+    @field_validator("func_name")
+    @classmethod
     def name_in_callbacks(cls, v):
         if not(hasattr(callbacks, v)):
             raise ValueError(f"callback {v} not available in callbacks")
@@ -39,7 +40,8 @@ class CallbackUrl(BaseModel):
     refresh_token: Optional[str] = None
     token: Optional[str] = None
 
-    @validator("url")
+    @field_validator("url")
+    @classmethod
     def validate_url(cls, v):
         try:
             r = requests.get(
@@ -49,7 +51,7 @@ class CallbackUrl(BaseModel):
             raise ValueError(f"Maximum retries on connection {v} reached")
         return v
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     def replace_token(self):
         """
         Checks if the token has expired, and replaces it upon creating this instance
@@ -58,7 +60,7 @@ class CallbackUrl(BaseModel):
         -------
 
         """
-        if self.get("refresh_token"):
+        if self.refresh_token:
             # ensure you have a fresh token before continuing
             url = self.url + self.token_refresh_endpoint
             body = {"refresh": self.refresh_token}
@@ -95,8 +97,9 @@ class Storage(BaseModel):
         """
         obj.seek(0)
         fn = os.path.join(self.bucket, dest)
-        if not(os.path.isdir(os.path.basename(fn))):
-            os.makedirs(os.path.basename(fn))
+        path = os.path.split(fn)[0]
+        if not(os.path.isdir(path)):
+            os.makedirs(path)
         # create file
         with open(fn, "wb") as f:
             f.write(obj.read())
@@ -196,7 +199,8 @@ class Subtask(BaseModel):
     # files that are produced from the subtask (relative to .tmp location) and remote location
     output_files: Optional[Dict[str, File]] = {}
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def name_in_service(cls, v):
         if not(hasattr(service, v)):
             raise ValueError(f"task {v} not available in pyorc.service")
@@ -285,7 +289,7 @@ class Subtask(BaseModel):
         else:
             headers = {}
         msg = func(self.output_files, tmp=tmp)
-        url = urljoin(str(callback_url.url), self.callback.callback_endpoint)
+        url = urljoin(str(callback_url.url), self.callback.endpoint)
         # perform callback (arrange the adding of token)
         request(
             url,
@@ -303,16 +307,14 @@ class Task(BaseModel):
     """
     id: str = str(uuid.uuid4())
     time: datetime = datetime.now()
-    callback_url: CallbackUrl
+    callback_url: Optional[Any] = None
     callback_endpoint_error: str = "/processing/examplevideo/error"
     callback_endpoint_complete: str = "/processing/examplevideo/complete"
     storage: Optional[Storage] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[List[File]] = []  # files that are needed to perform any subtask
     logger: logging.Logger = logging
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
     def execute(self, tmp):
@@ -338,7 +340,6 @@ class Task(BaseModel):
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
             self.execute_subtasks(tmp)
-            self.logger.info(f"Removing temporary files")
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
             # if the video was treated successfully, then we may move it to a location of interest if wanted
             if success_path:
@@ -352,6 +353,7 @@ class Task(BaseModel):
                 [input_file.move(tmp, failed_path) for input_file in self.input_files]
 
         # clean up the temp location
+        self.logger.info(f"Removing temporary files")
         shutil.rmtree(tmp)
 
         # report success or error
