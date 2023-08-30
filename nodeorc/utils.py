@@ -41,15 +41,13 @@ def get_s3(
 
 
 def get_bucket(
-    endpoint_url,
-    aws_access_key_id,
-    aws_secret_access_key,
+    url,
     bucket_name,
+    **kwargs
 ):
     s3 = get_s3(
-        endpoint_url=endpoint_url,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
+        endpoint_url=url,
+        **kwargs
     )
     if s3.Bucket(bucket_name) not in s3.buckets.all():
         s3.create_bucket(Bucket=bucket_name)
@@ -61,10 +59,11 @@ def get_bucket(
     else:
         return None
 
-def upload_file(obj, bucket, dest=None, logger=logging):
+def upload_io(obj, bucket, dest=None, logger=logging):
     """
     Uploads BytesIO obj representation of data in file 'fn' in bucket
     """
+
     r = bucket.upload_fileobj(obj, dest)
     logger.info(f"{bucket}/{dest} created")
     return r

@@ -1,0 +1,7 @@
+requests
+boto3
+ibm-cos-sdk
+pika
+pydantic==2.3.0
+pyopenrivercam
+python-dotenv
