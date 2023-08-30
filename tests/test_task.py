@@ -22,5 +22,5 @@ def test_velocity_flow(task, temp_path):
 
 
 
-def test_velocity_flow(task_local, temp_path):
+def test_velocity_flow_local(task_local, temp_path):
     task_local.execute(temp_path)

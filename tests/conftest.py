@@ -47,6 +47,15 @@ def crossection_url():
 
 
 @pytest.fixture
+def crossection(crossection_url):
+    r = requests.get(crossection_url)
+    obj = BytesIO(r.content)
+    obj.seek(0)
+    return json.load(obj)
+
+
+
+@pytest.fixture
 def camconfig(camconfig_url):
     r = requests.get(camconfig_url)
     return r.json()
@@ -65,13 +74,13 @@ def channel():
 
 
 @pytest.fixture
-def recipe(recipe_url, temp_path):
+def recipe(recipe_url, crossection):
     r = requests.get(recipe_url)
     recipe = yaml.load(r.text, Loader=yaml.FullLoader)
     # use the validation scheme of pyorc to validate the recipe
     recipe = pyorc.cli.cli_utils.validate_recipe(recipe)
-    # replace the location of the cross section file
-    recipe["transect"]["transect_1"]["shapefile"] = os.path.join(temp_path, "crosssection.geojson")
+    # replace the location of the cross section file by an already read geojson
+    recipe["transect"]["transect_1"]["geojson"] = crossection
     # we'll leave the second transect for simplicity
     del recipe["transect"]["transect_2"]
     del recipe["plot"]["plot_quiver"]["transect"]["transect_2"]
