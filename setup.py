@@ -21,7 +21,8 @@ setup(
         "boto3",
         "ibm-cos-sdk",
         "pyopenrivercam",
-        "pydantic",
+        "pydantic==2.3.0",
+        "python-dotenv"
     ],
     extras_require={
         "dev": ["pytest", "pytest-cov", "pytest-lazy-fixtures"],
