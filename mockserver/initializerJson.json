@@ -28,7 +28,7 @@
     }
   },
   {
-    "id": "post_discharge",
+    "id": "patch_discharge",
     "priority": 0,
     "httpRequest": {
       "method": "PATCH",

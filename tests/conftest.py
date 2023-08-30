@@ -167,6 +167,18 @@ def callback():
     )
     return obj
 
+
+@pytest.fixture
+def callback_patch():
+    obj = models.Callback(
+        func_name="discharge",
+        kwargs={},
+        request_type="PATCH",
+        endpoint="/api/timeseries/1"  # used to extend the default callback url
+    )
+    return obj
+
+
 @pytest.fixture
 def input_file(s3_video_sample, video_sample_url):
     storage, filename, filename_cs = s3_video_sample
