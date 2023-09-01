@@ -208,25 +208,25 @@ def output_file_cs():
 
 
 @pytest.fixture
-def subtask(callback, input_file, output_file, output_file_cs, kwargs_piv):
+def subtask(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
         callback=callback,
-        input_files={"videofile": input_file},
-        output_files={"piv": output_file, "transect": output_file_cs}
+        input_files={"videofile": models.File()},
+        output_files={"piv": models.File(), "transect": models.File()}
     )
     return obj
 
 
 @pytest.fixture
-def subtask_local(callback, input_file_local, output_file, output_file_cs, kwargs_piv):
+def subtask_local(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
         callback=callback,
-        input_files={"videofile": input_file_local},
-        output_files={"piv": output_file, "transect": output_file_cs}
+        input_files={"videofile": models.File()},
+        output_files={"piv": models.File(), "transect": models.File()}
     )
     return obj
 
@@ -251,20 +251,30 @@ def task(callback_url, s3storage, subtask, input_file, logger):
         callback_url=callback_url,
         storage=s3storage,
         subtasks=[subtask],
-        input_files=[input_file],
+        input_files={"videofile": input_file},
+        output_files={"piv": output_file, "transect": output_file_cs},
         logger=logger
         # files that are needed to perform any subtask
     )
     return obj
 
 @pytest.fixture
-def task_local(callback_url, storage, subtask_local, input_file_local, logger):
+def task_local(
+        callback_url,
+        storage,
+        subtask_local,
+        input_file_local,
+        output_file,
+        output_file_cs,
+        logger
+):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=storage,
         subtasks=[subtask_local],
-        input_files=[input_file_local],
+        input_files={"videofile": input_file_local},
+        output_files={"piv": output_file, "transect": output_file_cs},
         logger=logger
         # files that are needed to perform any subtask
     )

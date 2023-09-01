@@ -200,6 +200,7 @@ class Subtask(BaseModel):
     """
     Definition of a subtask with its keyword arguments (connects to pyorc.service level)
     """
+
     name: str = "VelocityFlowProcessor"  # name of subtask to perform (see pyorc.service)
     kwargs: Dict = {}  # keyword args used for subtask
     # these files are added as filled in after download in the kwargs
@@ -234,6 +235,28 @@ class Subtask(BaseModel):
             self.upload_outputs(storage, tmp)
         if self.callback and callback_url:
             self.execute_callback(callback_url, tmp=tmp)
+
+    def replace_files(self, input_files, output_files):
+        """
+        replace the mock files of inputs and outputs with the actual files as defined in main task
+
+        Parameters
+        ----------
+        input_files : Dict[str, File]
+            Input files as defined on main task level
+        output_files : Dict[str, File]
+            Output files as defined on main task level
+
+        Returns
+        -------
+
+        """
+        for k, v in input_files.items():
+            if k in self.input_files:
+                self.input_files[k] = v
+        for k, v in output_files.items():
+            if k in self.output_files:
+                self.output_files[k] = v
 
 
     def replace_kwargs_files(self, tmp="."):
@@ -323,9 +346,27 @@ class Task(BaseModel):
     callback_endpoint_complete: str = "/processing/examplevideo/complete"
     storage: Optional[Union[S3Storage, Storage]] = None
     subtasks: Optional[List[Subtask]] = []
-    input_files: Optional[List[File]] = []  # files that are needed to perform any subtask
+    input_files: Optional[Dict[str, File]] = {}  # files that are needed to perform any subtask
+    # files that are produced from the subtask (relative to .tmp location) and remote location
+    output_files: Optional[Dict[str, File]] = {}
+
     logger: logging.Logger = logging
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="after")
+    def replace_subtask_files(self) -> 'Task':
+        """
+        Checks if the token has expired, and replaces it upon creating this instance
+
+        Returns
+        -------
+
+        """
+        # replace any inputs / outputs of subtasks (which may be mocks) with inputs / outputs defined in main task
+        for subtask in self.subtasks:
+            subtask.replace_files(self.input_files, self.output_files)
+        return self
+
 
 
     def execute(self, tmp):
@@ -355,13 +396,13 @@ class Task(BaseModel):
             # if the video was treated successfully, then we may move it to a location of interest if wanted
             if success_path:
                 # move the video
-                [input_file.move(tmp, success_path) for input_file in self.input_files]
+                [input_file.move(tmp, success_path) for key, input_file in self.input_files.items()]
 
         except BaseException as e:
             r = self.callback_error(msg=str(e))
             if failed_path:
                 # we move the non-succeeded video to a separate path for inspection
-                [input_file.move(tmp, failed_path) for input_file in self.input_files]
+                [input_file.move(tmp, failed_path) for key, input_file in self.input_files.items()]
 
         # clean up the temp location
         self.logger.info(f"Removing temporary files")
@@ -384,7 +425,7 @@ class Task(BaseModel):
             path to temporary local file store
 
         """
-        for file in self.input_files:
+        for key, file in self.input_files.items():
             trg = os.path.join(tmp, file.tmp_name)
             # put the input file on tmp location
             self.storage.download_file(file.remote_name, trg)
@@ -437,11 +478,26 @@ class Task(BaseModel):
         )
         return r
 
-    def to_file(self, fn):
+    def to_file(self, fn, **kwargs):
         with open(fn, "w") as f:
-            f.write(self.to_json())
+            f.write(self.to_json(**kwargs))
 
-    def to_json(self, indent=4):
+    def to_json(self, indent=0, template=False):
+        """
+        Write task to fully serializable json format
+
+        Parameters
+        ----------
+        indent : int
+            indentation of json string (typically only used for
+        template :
+            write as template instead of full task. This means that dynamic fields are removed before writing.
+            These fields are: id, time, input_files, :
+
+        Returns
+        -------
+
+        """
         # make a copy of self before tampering with it
         task_copy = copy.deepcopy((self))
         if hasattr(self, "logger"):
