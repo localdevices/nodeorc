@@ -70,7 +70,7 @@ def process(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 # @click.group()
-@click.command
+@click.command()
 @click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
 @storage_opt
 @listen_opt

@@ -104,25 +104,34 @@ class Storage(BaseModel):
         with open(fn, "wb") as f:
             f.write(obj.read())
 
-    def download_file(self, filename, trg):
+    def download_file(self, src, trg, keep_src=False):
         """
         Download file from one local location to another target file (entire path inc. filename)
 
         Parameters
         ----------
-        filename : str
+        src : str
             file within local bucket
 
-        trg : file as it should be named locally
+        trg : str
+            file as it should be named locally
+        keep_src : bool
+            if set, the file is copied, if not set, a rename will be performed instead.
 
         Returns
         -------
 
         """
-        shutil.copyfile(
-            os.path.join(self.bucket, filename),
-            trg
-        )
+        if keep_src:
+            shutil.copyfile(
+                os.path.join(self.bucket, src),
+                trg
+            )
+        else:
+            os.rename(
+                os.path.join(self.bucket, src),
+                trg
+            )
 
 class S3Storage(Storage):
     url: AnyHttpUrl = "http://127.0.0.1:9000"
@@ -140,13 +149,13 @@ class S3Storage(Storage):
     def upload_io(self, obj, dest, **kwargs):
         utils.upload_io(obj, self.bucket, dest=dest, **kwargs)
 
-    def download_file(self, filename, trg):
+    def download_file(self, src, trg):
         """
         Download file from bucket to specified target file (entire path inc. filename)
 
         Parameters
         ----------
-        filename : str
+        src : str
             file within bucket
 
         trg : file as it should be named locally
@@ -155,7 +164,7 @@ class S3Storage(Storage):
         -------
 
         """
-        self.bucket.download_file(filename, trg)
+        self.bucket.download_file(src, trg)
 
 
 
