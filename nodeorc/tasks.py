@@ -12,6 +12,7 @@ WATER_LEVEL_WILDCARD = os.getenv("WATER_LEVEL_WILDCARD")  # full file path templ
 VIDEO_DATETIMEFMT = os.getenv("VIDEO_DATETIMEFMT", "%Y%m%d_%H%M%S")  # Format used to produce file names and datetime stamps in water level files
 VIDEO_FILE_FMT = os.getenv("VIDEO_FILE_FMT")  # string format of files. space in {} is assumed to be filled with a datetime of format VIDEO_DATETIMEFMT
 PARSE_DATE_FROM_FILENAME = bool(os.getenv("PARSE_DATE_FROM_FILENAME", "False").lower() == "true")  # if True, then the datetime
+CALLBACK_URL = "http://127.0.0.1:1080"
 # is taken from the filename, otherwise datetime is taken from the file's metadata. The last is adviced when power
 # cycling without a Real-Time-Clock is used, as then the time on the filename is not correct
 
@@ -61,8 +62,8 @@ def get_water_level(
     return h_a
 
 
-def process_file(file_path, temp_path, task_template, logger=logging):
-    print(f"Processing file: {file_path}")
+def process_file(file_path, temp_path, task_template, processed_files, logger=logging):
+    logger.info(f"Processing file: {file_path}")
     # determine time stamp
     timestamp = get_timestamp(file_path)
 
@@ -70,14 +71,17 @@ def process_file(file_path, temp_path, task_template, logger=logging):
     h_a = get_water_level(timestamp)
 
     # prepare input_files field in task definition
-    input_files = [
-        models.File(
+    input_files = {
+        "videofile": models.File(
             remote_name=file_path,
             tmp_name=file_path
         )
-    ]
+    }
+    callback_url = models.CallbackUrl(url=CALLBACK_URL)
+
     task = models.Task(
         time=timestamp,
+        callback_url=callback_url,
         input_files=input_files,
         logger=logger,
         **task_template
@@ -89,11 +93,18 @@ def process_file(file_path, temp_path, task_template, logger=logging):
     # process the task
     task.execute(temp_path)
 
+    # once done, the file is removed from list of considered files for processing
+    processed_files.remove(file_path)
+
 
 def local_tasks(task_template, incoming_video_path, temp_path, logger=logging):
     # Create an event object
+
     nodeorc_event = threading.Event()
     logger.info(f"I am monitoring {incoming_video_path}")
+
+    # make a list for processed files or files that are being processed so that they are not duplicated
+    processed_files = set()
 
     # Create and start the thread
     nodeorc_thread = threading.Thread(
@@ -103,6 +114,7 @@ def local_tasks(task_template, incoming_video_path, temp_path, logger=logging):
             temp_path,
             task_template,
             logger,
+            processed_files,
             nodeorc_event,
             2
         )
@@ -122,18 +134,19 @@ def local_tasks(task_template, incoming_video_path, temp_path, logger=logging):
 
 
 # Define the function that will run in the thread to monitor the folder
-def folder_monitor(folder_path, temp_path, task_template, logger, event, max_workers=1):
+def folder_monitor(folder_path, temp_path, task_template, logger, processed_files, event, max_workers=1):
     # Get the number of available CPU cores
     # num_cores = multiprocessing.cpu_count()
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         while not event.is_set():
             for filename in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, filename)
-                if os.path.isfile(file_path):
+                if os.path.isfile(file_path) and file_path not in processed_files:
                     print(f"Found file: {file_path}")
                     # Submit the file processing task to the thread pool
-                    executor.submit(process_file, file_path, temp_path, task_template, logger)
-                    # Optionally, you can move or delete the processed file
-                    os.remove(file_path)
+                    executor.submit(process_file, file_path, temp_path, task_template, processed_files, logger)
+                    processed_files.add(file_path)
+                    # # Optionally, you can move or delete the processed file
+                    # os.remove(file_path)
             time.sleep(1)  # Adjust the sleep interval as needed
 

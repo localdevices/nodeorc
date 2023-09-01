@@ -103,7 +103,7 @@ def cli(storage, listen):
             task_template = json.load(f)
         # verify that task_template can be converted to a valid Task
         try:
-            task_test = models.Task(input_files=[models.File()], **task_template)
+            task_test = models.Task(**task_template)
         except Exception as e:
             logger.error(f"Settings in {os.path.abspath(settings_fn)} cannot be formed into a valid Task instance")
         try:
