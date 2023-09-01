@@ -235,6 +235,7 @@ def subtask_local(callback, kwargs_piv):
 def kwargs_piv(camconfig, recipe, temp_path):
     kwargs = {
         "videofile": "video.mp4",
+        "h_a": 0.0,
         "cameraconfig": camconfig,
         "recipe": recipe,
         "output": os.path.join(temp_path, "OUTPUT"),

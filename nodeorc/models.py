@@ -14,8 +14,11 @@ from io import BytesIO
 from nodeorc import callbacks, utils
 from urllib.parse import urljoin
 
-failed_path = os.getenv("FAILED_PATH")
-success_path = os.getenv("SUCCESS_PATH")
+
+FAILED_PATH = os.getenv("FAILED_PATH")
+SUCCESS_PATH = os.getenv("SUCCESS_PATH")
+REMOVE_FOR_TEMPLATE = ["input_files", "id", "time", "callback_url", "storage"]
+
 
 class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
@@ -394,15 +397,15 @@ class Task(BaseModel):
             self.execute_subtasks(tmp)
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
             # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if success_path:
+            if SUCCESS_PATH:
                 # move the video
-                [input_file.move(tmp, success_path) for key, input_file in self.input_files.items()]
+                [input_file.move(tmp, SUCCESS_PATH) for key, input_file in self.input_files.items()]
 
         except BaseException as e:
             r = self.callback_error(msg=str(e))
-            if failed_path:
+            if FAILED_PATH:
                 # we move the non-succeeded video to a separate path for inspection
-                [input_file.move(tmp, failed_path) for key, input_file in self.input_files.items()]
+                [input_file.move(tmp, FAILED_PATH) for key, input_file in self.input_files.items()]
 
         # clean up the temp location
         self.logger.info(f"Removing temporary files")
@@ -478,9 +481,9 @@ class Task(BaseModel):
         )
         return r
 
-    def to_file(self, fn, **kwargs):
+    def to_file(self, fn, indent=4, **kwargs):
         with open(fn, "w") as f:
-            f.write(self.to_json(**kwargs))
+            f.write(self.to_json(indent=4, **kwargs))
 
     def to_json(self, indent=0, template=False):
         """
@@ -502,7 +505,11 @@ class Task(BaseModel):
         task_copy = copy.deepcopy((self))
         if hasattr(self, "logger"):
             # remove the logger object which is not serializable
-            del task_copy.logger
+            delattr(task_copy, "logger")
+        if template:
+            # save as a template, so remove all dynamic items such as id, input files and time
+            for attr in REMOVE_FOR_TEMPLATE:
+                delattr(task_copy, attr)
         task_json = task_copy.model_dump_json(indent=indent)
         # load back and then store with indents
         return task_json
