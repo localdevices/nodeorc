@@ -96,7 +96,7 @@ def s3_video_sample(video_sample_url, s3storage):
     s3storage, filename = prep_video_sample(video_sample_url, s3storage)
     yield s3storage, filename
     print(f"Deleting {os.path.split(video_sample_url)[-1]}")
-    storage.bucket.objects.filter(Prefix=filename).delete()
+    s3storage.bucket.objects.filter(Prefix=filename).delete()
 
 @pytest.fixture
 def local_video_sample(video_sample_url, storage):
@@ -245,13 +245,13 @@ def kwargs_piv(camconfig, recipe, temp_path):
 
 
 @pytest.fixture
-def task(callback_url, s3storage, subtask, input_file, input_file_cs, logger):
+def task(callback_url, s3storage, subtask, input_file, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=s3storage,
         subtasks=[subtask],
-        input_files=[input_file, input_file_cs],
+        input_files=[input_file],
         logger=logger
         # files that are needed to perform any subtask
     )

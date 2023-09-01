@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -5,7 +6,7 @@ import requests
 import shutil
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Any, AnyStr
+from typing import List, Optional, Dict, Any, AnyStr, Union
 from pydantic import field_validator, BaseModel, AnyHttpUrl, ConfigDict, model_validator
 from pyorc import service
 from io import BytesIO
@@ -52,7 +53,7 @@ class CallbackUrl(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def replace_token(self):
+    def replace_token(self) -> 'CallbackUrl':
         """
         Checks if the token has expired, and replaces it upon creating this instance
 
@@ -66,6 +67,7 @@ class CallbackUrl(BaseModel):
             body = {"refresh": self.refresh_token}
             r = requests.post(url, json=body)
             self.token = r.json()["access"]
+        return self
 
 
 class Storage(BaseModel):
@@ -316,10 +318,10 @@ class Task(BaseModel):
     """
     id: str = str(uuid.uuid4())
     time: datetime = datetime.now()
-    callback_url: Optional[Any] = None
+    callback_url: Optional[CallbackUrl] = None
     callback_endpoint_error: str = "/processing/examplevideo/error"
     callback_endpoint_complete: str = "/processing/examplevideo/complete"
-    storage: Optional[Storage] = None
+    storage: Optional[Union[S3Storage, Storage]] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[List[File]] = []  # files that are needed to perform any subtask
     logger: logging.Logger = logging
@@ -434,3 +436,17 @@ class Task(BaseModel):
             }
         )
         return r
+
+    def to_file(self, fn):
+        with open(fn, "w") as f:
+            f.write(self.to_json())
+
+    def to_json(self, indent=4):
+        # make a copy of self before tampering with it
+        task_copy = copy.deepcopy((self))
+        if hasattr(self, "logger"):
+            # remove the logger object which is not serializable
+            del task_copy.logger
+        task_json = task_copy.model_dump_json(indent=indent)
+        # load back and then store with indents
+        return task_json
