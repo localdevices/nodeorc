@@ -78,7 +78,14 @@ def start_logger(verbose, quiet):
     else:
         quiet = 0
     base_path = os.path.split(__file__)[0]
-    logfile = os.path.join(base_path, "..", "log", f"nodeorc_{timestr}.log")
+    logfile = os.path.abspath(
+        os.path.join(
+            base_path,
+            "..",
+            "log",
+            f"nodeorc_{timestr}.log"
+        )
+    )
     log_level = max(10, 30 - 10 * (verbose - quiet))
     logger = setuplog(
         name="NodeOpenRiverCam",

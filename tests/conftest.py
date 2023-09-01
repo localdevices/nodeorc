@@ -11,20 +11,14 @@ from io import BytesIO, StringIO
 from nodeorc import models, utils, log
 
 
-def prep_video_sample(video_sample_url, crossection_url, storage):
+def prep_video_sample(video_sample_url, storage):
     filename = os.path.split(video_sample_url)[-1]
-    filename_cs = os.path.split(crossection_url)[-1]
     print(f"Downloading {video_sample_url}")
     r = requests.get(video_sample_url)
     obj = BytesIO(r.content)
     print(f"Uploading {video_sample_url}")
     storage.upload_io(obj, dest=filename)
-    print(f"Downloading {crossection_url}")
-    r = requests.get(crossection_url)
-    obj = BytesIO(r.content)
-    print(f"Uploading {crossection_url}")
-    storage.upload_io(obj, dest=filename_cs)
-    return storage, filename, filename_cs
+    return storage, filename
 
 
 @pytest.fixture
@@ -97,31 +91,17 @@ def temp_path():
     return "./tmp"
 
 @pytest.fixture
-def s3_video_sample(video_sample_url, crossection_url, s3storage):
+def s3_video_sample(video_sample_url, s3storage):
     # upload a video sample to s3 bucket
-    s3storage, filename, filename_cs = prep_video_sample(video_sample_url, crossection_url, s3storage)
-    # filename = os.path.split(video_sample_url)[-1]
-    # filename_cs = os.path.split(crossection_url)[-1]
-    # print(f"Downloading {video_sample_url}")
-    # r = requests.get(video_sample_url)
-    # obj = BytesIO(r.content)
-    # print(f"Uploading {video_sample_url}")
-    # r = s3storage.upload_io(obj, dest=filename)
-    # # r = utils.upload_file(obj, storage.bucket[1], dest=filename)
-    # print(f"Downloading {crossection_url}")
-    # r = requests.get(crossection_url)
-    # obj = BytesIO(r.content)
-    # print(f"Uploading {crossection_url}")
-    # r = s3storage.upload_io(obj, dest=filename_cs)
-    #
-    yield s3storage, filename, filename_cs
+    s3storage, filename = prep_video_sample(video_sample_url, s3storage)
+    yield s3storage, filename
     print(f"Deleting {os.path.split(video_sample_url)[-1]}")
     storage.bucket.objects.filter(Prefix=filename).delete()
 
 @pytest.fixture
-def local_video_sample(video_sample_url, crossection_url, storage):
-    storage, filename, filename_cs = prep_video_sample(video_sample_url, crossection_url, storage)
-    yield storage, filename, filename_cs
+def local_video_sample(video_sample_url, storage):
+    storage, filename = prep_video_sample(video_sample_url, storage)
+    yield storage, filename
     # at the end remove the entire bucket
     # storage.delete()
 
@@ -190,41 +170,23 @@ def callback_patch():
 
 @pytest.fixture
 def input_file(s3_video_sample, video_sample_url):
-    storage, filename, filename_cs = s3_video_sample
+    storage, filename = s3_video_sample
     obj = models.File(
         remote_name=filename,
         tmp_name="video.mp4",
     )
     return obj
 
-
-@pytest.fixture
-def input_file_cs(s3_video_sample, crossection_url):
-    storage, filename, filename_cs = s3_video_sample
-    obj = models.File(
-        remote_name=filename_cs,
-        tmp_name="crosssection.geojson",
-    )
-    return obj
 
 @pytest.fixture
 def input_file_local(local_video_sample):
-    storage, filename, filename_cs = local_video_sample
+    storage, filename = local_video_sample
     obj = models.File(
         remote_name=filename,
         tmp_name="video.mp4",
     )
     return obj
 
-
-@pytest.fixture
-def input_file_cs_local(local_video_sample, crossection_url):
-    storage, filename, filename_cs = local_video_sample
-    obj = models.File(
-        remote_name=filename_cs,
-        tmp_name="crosssection.geojson",
-    )
-    return obj
 
 
 @pytest.fixture
@@ -296,13 +258,13 @@ def task(callback_url, s3storage, subtask, input_file, input_file_cs, logger):
     return obj
 
 @pytest.fixture
-def task_local(callback_url, storage, subtask_local, input_file_local, input_file_cs_local, logger):
+def task_local(callback_url, storage, subtask_local, input_file_local, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=storage,
         subtasks=[subtask_local],
-        input_files=[input_file_local, input_file_cs_local],
+        input_files=[input_file_local],
         logger=logger
         # files that are needed to perform any subtask
     )
