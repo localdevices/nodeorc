@@ -7,7 +7,7 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any, AnyStr, Union
-from pydantic import field_validator, BaseModel, AnyHttpUrl, ConfigDict, model_validator
+from pydantic import field_validator, BaseModel, AnyHttpUrl, ConfigDict, model_validator, DirectoryPath, StrictBool
 from pyorc import service
 from io import BytesIO
 # nodeodm specific imports
@@ -15,9 +15,19 @@ from nodeorc import callbacks, utils
 from urllib.parse import urljoin
 
 
-FAILED_PATH = os.getenv("FAILED_PATH")
-SUCCESS_PATH = os.getenv("SUCCESS_PATH")
 REMOVE_FOR_TEMPLATE = ["input_files", "id", "time", "callback_url", "storage"]
+
+def check_datetime_fmt(fn_fmt):
+    # check string within {}, see if that can be parsed to datetime
+    try:
+        fmt = fn_fmt.split('{"')[1].split('"}')[0]
+    except:
+        raise ValueError('{:s} does not contain a datetime format between {""} signs'.format(v))
+    try:
+        datestr = datetime.datetime(2000, 1, 1, 1, 1, 1).strftime(fmt)
+    except:
+        raise ValueError(f'Date format "{fmt}" is not a valid date format pattern')
+    return True
 
 
 class Callback(BaseModel):
@@ -50,9 +60,10 @@ class CallbackUrl(BaseModel):
         try:
             r = requests.get(
                 v,
+                timeout=5,
             )
         except requests.exceptions.ConnectionError as e:
-            raise ValueError(f"Maximum retries on connection {v} reached")
+            raise ValueError(f"Timeout of 5 seconds reached on connection {v} reached")
         return v
 
     @model_validator(mode="after")
@@ -221,7 +232,7 @@ class Subtask(BaseModel):
             raise ValueError(f"task {v} not available in pyorc.service")
         return v
 
-    def execute(self, storage=None, tmp=".", callback_url=None, logger=logging):
+    def execute(self, timestamp=None, storage=None, tmp=".", callback_url=None, logger=logging):
         """
         Execute the subtask and return outputs to defined storage (if provided)
 
@@ -237,7 +248,7 @@ class Subtask(BaseModel):
         if storage is not None:
             self.upload_outputs(storage, tmp)
         if self.callback and callback_url:
-            self.execute_callback(callback_url, tmp=tmp)
+            self.execute_callback(callback_url, timestamp=timestamp, tmp=tmp)
 
     def replace_files(self, input_files, output_files):
         """
@@ -310,7 +321,7 @@ class Subtask(BaseModel):
             storage.upload_io(obj, dest=v.remote_name)
 
 
-    def execute_callback(self, callback_url, tmp):
+    def execute_callback(self, callback_url, timestamp, tmp):
         # get the name of callback
         func = getattr(callbacks, self.callback.func_name)
         # get the type of request. Typically this is POST for an entirely new time series record created from an edge
@@ -325,15 +336,16 @@ class Subtask(BaseModel):
             headers = {"Authorization": f"Bearer {callback_url.token}"}
         else:
             headers = {}
-        msg = func(self.output_files, tmp=tmp)
+        msg = func(self.output_files, timestamp=timestamp, tmp=tmp)
         url = urljoin(str(callback_url.url), self.callback.endpoint)
         # perform callback (arrange the adding of token)
-        request(
+        r = request(
             url,
             json=msg,
             headers=headers
-        ) #json.dumps(msg))
-
+        )
+        if r.status_code != 200:
+            raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
 
 
 
@@ -394,7 +406,7 @@ class Task(BaseModel):
             self.download_input(tmp)
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
-            self.execute_subtasks(tmp)
+            self.execute_subtasks(tmp, timestamp=self.time)
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
             # if the video was treated successfully, then we may move it to a location of interest if wanted
             if SUCCESS_PATH:
@@ -435,7 +447,7 @@ class Task(BaseModel):
             # self.storage.bucket.download_file(file.remote_name, trg)
 
 
-    def execute_subtasks(self, tmp):
+    def execute_subtasks(self, tmp, timestamp=None):
         """
 
         Parameters
@@ -446,7 +458,7 @@ class Task(BaseModel):
         """
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
-            subtask.execute(storage=self.storage, tmp=tmp, callback_url=self.callback_url, logger=self.logger)
+            subtask.execute(timestamp=timestamp, storage=self.storage, tmp=tmp, callback_url=self.callback_url, logger=self.logger)
 
     def callback_error(self, msg):
         """
@@ -513,3 +525,47 @@ class Task(BaseModel):
         task_json = task_copy.model_dump_json(indent=indent)
         # load back and then store with indents
         return task_json
+
+
+
+# URLS
+# CALLBACK_URL = "http://172.0.0.2:1080"
+# "AMQP_CONNECTION_STRING"
+
+
+
+################### LOCAL PATHS
+# "INCOMING_VIDEO_PATH"
+
+
+
+class LocalConfig(BaseModel):
+    callback_url: CallbackUrl
+    storage: Storage
+    incoming_path: DirectoryPath
+    failed_path: DirectoryPath
+    success_path: DirectoryPath
+    results_path: DirectoryPath
+    parse_dates_from_file: StrictBool
+    video_file_fmt: str
+    water_level_fmt: str
+
+    @field_validator("video_file_fmt")
+    @classmethod
+    def check_video_fmt(cls, v):
+        # check string within {}, see if that can be parsed to datetime
+        check_datetime_fmt(v)
+        return v
+
+
+    @field_validator("water_level_fmt")
+    @classmethod
+    def check_water_level_fmt(cls, v):
+        check_datetime_fmt(v)
+        return v
+
+
+
+class RemoteConfig(BaseModel):
+    amqp_connection: AnyHttpUrl
+

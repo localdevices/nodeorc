@@ -139,6 +139,4 @@ def cli(storage, listen):
 #         traceback.print_tb(e.__traceback__)
 
 if __name__ == "__main__":
-    # cli(sys.argv[1:])
     cli()
-    # main()

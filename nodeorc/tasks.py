@@ -9,10 +9,14 @@ import models
 import pandas as pd
 
 WATER_LEVEL_WILDCARD = os.getenv("WATER_LEVEL_WILDCARD")  # full file path template with a wildcard {} at the end for seeking a file. Within {} a %Y%m%d string is expected
-VIDEO_DATETIMEFMT = os.getenv("VIDEO_DATETIMEFMT", "%Y%m%d_%H%M%S")  # Format used to produce file names and datetime stamps in water level files
+VIDEO_DATETIMEFMT = os.getenv("VIDEO_DATETIMEFMT", "%Y%m%dT%H%M%S")  # Format used to produce file names and datetime stamps in water level files
+WATER_LEVEL_DATETIMEFMT = os.getenv("WATER_LEVEL_DATETIMEFMT", "%Y%m%d_%H%M%S")  # Format used to produce file names and datetime stamps in water level files
 VIDEO_FILE_FMT = os.getenv("VIDEO_FILE_FMT")  # string format of files. space in {} is assumed to be filled with a datetime of format VIDEO_DATETIMEFMT
 PARSE_DATE_FROM_FILENAME = bool(os.getenv("PARSE_DATE_FROM_FILENAME", "False").lower() == "true")  # if True, then the datetime
-CALLBACK_URL = "http://127.0.0.1:1080"
+CALLBACK_URL = "http://172.0.0.2:1080"
+VIDEO_RESULTS = "/home/hcwinsemius/nodeorc/results"
+FAILED_PATH = os.getenv("FAILED_PATH")
+SUCCESS_PATH = os.getenv("SUCCESS_PATH")
 # is taken from the filename, otherwise datetime is taken from the file's metadata. The last is adviced when power
 # cycling without a Real-Time-Clock is used, as then the time on the filename is not correct
 
@@ -50,7 +54,7 @@ def read_water_level_file(fn, fmt):
 def get_water_level(
     timestamp,
     fn_wildcard=WATER_LEVEL_WILDCARD,
-    datetimefmt=VIDEO_DATETIMEFMT
+    datetimefmt=WATER_LEVEL_DATETIMEFMT
 ):
     # get the file belonging to current date, water levels MUST be stored per day!
     fn = fn_wildcard.format(timestamp.strftime("%Y%m%d"))
@@ -63,35 +67,81 @@ def get_water_level(
 
 
 def process_file(file_path, temp_path, task_template, processed_files, logger=logging):
-    logger.info(f"Processing file: {file_path}")
-    # determine time stamp
-    timestamp = get_timestamp(file_path)
+    try:
+        url, filename = os.path.split(file_path)
+        cur_path = file_path
+        logger.info(f"Processing file: {file_path}")
+        # determine time stamp
+        try:
+            timestamp = get_timestamp(file_path)
+        except:
+            raise ValueError(f"Could not get a logical timestamp from file {file_path}")
+        # create Storage instance
+        storage = models.Storage(url=VIDEO_RESULTS, bucket_name=timestamp.strftime("%Y%m%d"))
+        # move the file to the intended bucket
+        if not os.path.isdir(storage.bucket):
+            os.makedirs(storage.bucket)
+        os.rename(file_path, os.path.join(storage.bucket, filename))
+        # update the location of the current path of the video file
+        cur_path = os.path.join(storage.bucket, filename)
+        # collect water level
+        try:
+            h_a = get_water_level(timestamp)
+        except:
+            raise ValueError(f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}")
 
-    # collect water level
-    h_a = get_water_level(timestamp)
+        # prepare input_files field in task definition
+        input_files = {
+            "videofile": models.File(
+                remote_name=filename,
+                tmp_name=filename
+            )
+        }
+        output_files = {
+            "piv": models.File(
+                remote_name=f"piv_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+                tmp_name="OUTPUT/piv.nc"
+            ),
+            "piv_mask": models.File(
+                remote_name=f"piv_mask_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+                tmp_name="OUTPUT/piv_mask.nc"
+            ),
+            "transect": models.File(
+                remote_name=f"transect_1_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+                tmp_name="OUTPUT/transect_transect_1.nc"
+            ),
+            "jpg": models.File(
+                remote_name=f"plot_quiver_{timestamp.strftime('%Y%m%dT%H%M%S')}.jpg",
+                tmp_name="OUTPUT/plot_quiver.jpg"
+            ),
 
-    # prepare input_files field in task definition
-    input_files = {
-        "videofile": models.File(
-            remote_name=file_path,
-            tmp_name=file_path
+        }
+        callback_url = models.CallbackUrl(url=CALLBACK_URL)
+
+        task = models.Task(
+            time=timestamp,
+            callback_url=callback_url,
+            storage=storage,
+            input_files=input_files,
+            output_files=output_files,
+            logger=logger,
+            **task_template
         )
-    }
-    callback_url = models.CallbackUrl(url=CALLBACK_URL)
 
-    task = models.Task(
-        time=timestamp,
-        callback_url=callback_url,
-        input_files=input_files,
-        logger=logger,
-        **task_template
-    )
+        # replace water level
+        task.subtasks[0].kwargs["h_a"] = h_a
+        # set cur_path to tmp location
+        cur_path = os.path.join(temp_path, filename)
+        # process the task
+        task.execute(temp_path)
 
-    # replace water level
-    task.subtasks[0].kwargs["h_a"] = h_a
 
-    # process the task
-    task.execute(temp_path)
+    except Exception as e:
+        logger.error(f"Error processing {file_path}: {str(e)}")
+        # find back the file and place in the failed location
+        dst = os.path.join(FAILED_PATH, filename)
+        os.rename(cur_path, dst)
+
 
     # once done, the file is removed from list of considered files for processing
     processed_files.remove(file_path)
