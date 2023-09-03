@@ -4,6 +4,7 @@ import pika
 import pyorc
 import pytest
 import requests
+import shutil
 import yaml
 
 from datetime import datetime
@@ -19,6 +20,39 @@ def prep_video_sample(video_sample_url, storage):
     print(f"Uploading {video_sample_url}")
     storage.upload_io(obj, dest=filename)
     return storage, filename
+
+
+@pytest.fixture
+def incoming_path():
+    path = "incoming"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def failed_path():
+    path = "failed"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def success_path():
+    path = "success"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def results_path():
+    path = "results"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
 
 
 @pytest.fixture
