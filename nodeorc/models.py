@@ -546,7 +546,7 @@ class LocalConfig(BaseModel):
     failed_path: DirectoryPath
     success_path: DirectoryPath
     results_path: DirectoryPath
-    parse_dates_from_file: StrictBool
+    parse_dates_from_file: StrictBool = False
     video_file_fmt: str
     water_level_fmt: str
 

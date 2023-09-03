@@ -5,7 +5,7 @@ import numpy as np
 import os
 import time
 import datetime
-import models
+from . import models
 import pandas as pd
 
 WATER_LEVEL_WILDCARD = os.getenv("WATER_LEVEL_WILDCARD")  # full file path template with a wildcard {} at the end for seeking a file. Within {} a %Y%m%d string is expected
