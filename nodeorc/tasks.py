@@ -143,6 +143,30 @@ class LocalTaskProcessor:
             except Exception as e:
                 raise ValueError(f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}")
 
+            # output_files = {
+            #     "piv": models.File(
+            #         remote_name=f"piv_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+            #         tmp_name="OUTPUT/piv.nc"
+            #     ),
+            #     "piv_mask": models.File(
+            #         remote_name=f"piv_mask_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+            #         tmp_name="OUTPUT/piv_mask.nc"
+            #     ),
+            #     "transect": models.File(
+            #         remote_name=f"transect_1_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
+            #         tmp_name="OUTPUT/transect_transect_1.nc"
+            #     ),
+            #     "jpg": models.File(
+            #         remote_name=f"plot_quiver_{timestamp.strftime('%Y%m%dT%H%M%S')}.jpg",
+            #         tmp_name="OUTPUT/plot_quiver.jpg"
+            #     ),
+            #     "output": models.File(
+            #         remote_name=None,
+            #         tmp_name="OUTPUT"
+            #     ),
+            #
+            # }
+            task_form = copy.deepcopy(self.task_form)
             # prepare input_files field in task definition
             input_files = {
                 "videofile": models.File(
@@ -151,31 +175,12 @@ class LocalTaskProcessor:
                 )
             }
             output_files = {
-                "piv": models.File(
-                    remote_name=f"piv_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-                    tmp_name="OUTPUT/piv.nc"
-                ),
-                "piv_mask": models.File(
-                    remote_name=f"piv_mask_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-                    tmp_name="OUTPUT/piv_mask.nc"
-                ),
-                "transect": models.File(
-                    remote_name=f"transect_1_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-                    tmp_name="OUTPUT/transect_transect_1.nc"
-                ),
-                "jpg": models.File(
-                    remote_name=f"plot_quiver_{timestamp.strftime('%Y%m%dT%H%M%S')}.jpg",
-                    tmp_name="OUTPUT/plot_quiver.jpg"
-                ),
-                "output": models.File(
-                    remote_name=None,
-                    tmp_name="OUTPUT"
-                ),
-
+                k: models.File(
+                    remote_name = v["remote_name"].format(timestamp.strftime('%Y%m%dT%H%M%S')),
+                    tmp_name = v["tmp_name"]
+                ) for k, v in task_form["output_files"].items()
             }
-            task_form = copy.deepcopy(self.task_form)
             # replace input and output files
-            # del task_form["input_files"]
             for repl_arg in REPLACE_ARGS:
                 if repl_arg in task_form:
                     del task_form[repl_arg]

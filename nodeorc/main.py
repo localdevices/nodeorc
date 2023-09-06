@@ -15,10 +15,8 @@ load_dotenv()
 
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
-settings_fn = os.path.join(settings_path, "settings.json")
-task_form_fn = os.path.join(settings_path, "task_template.json")
 
-def load_settings():
+def load_settings(settings_fn):
     # define local settings below
     if os.path.isfile(settings_fn):
         try:
@@ -79,6 +77,18 @@ listen_opt = click.option(
          'listening to a locally mounted folder for new videos, or "AMQP" for tasks sent from a remote platform)',
     callback=validate_listen
 )
+settings_opt = click.option(
+    "--settings",
+    type=click.Path(exists=True),
+    help="location of the settings .json file",
+    default=os.path.join(settings_path, "settings.json")
+)
+task_form_opt = click.option(
+    "--task_form",
+    type=click.Path(exists=True),
+    help="location of the task form .json file",
+    default=os.path.join(settings_path, "task_form.json")
+)
 
 # Callback function for each process task that is queued.
 # def process(ch, method, properties, body):
@@ -99,24 +109,26 @@ listen_opt = click.option(
 @click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
 @storage_opt
 @listen_opt
-def cli(storage, listen):
+@settings_opt
+@task_form_opt
+def cli(storage, listen, settings, task_form):
     print(storage)
     logger = log.start_logger(True, False)
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
     if listen == "local":
-        settings = load_settings()
+        settings = load_settings(settings)
         if settings is None:
             raise IOError("For local processing, a settings file must be present in /settings/settings.json. Please create or modify your settings accordingly")
         # validate the settings into a task model
-        with open(task_form_fn, "r") as f:
+        with open(task_form, "r") as f:
             task_form = json.load(f)
         # verify that task_template can be converted to a valid Task
         try:
             task_test = models.Task(**task_form)
         except Exception as e:
-            logger.error(f"Task file in {os.path.abspath(task_form_fn)} cannot be formed into a valid Task instance")
+            logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance")
         try:
             tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
         except Exception as e:

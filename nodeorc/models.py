@@ -414,7 +414,9 @@ class Task(BaseModel):
 
         except BaseException as e:
             r = self.callback_error(msg=str(e))
-
+            msg = f"Error in processing of subtask. Reason: {str(e)}"
+            self.logger.error(msg)
+            raise Exception(msg)
         # # clean up the temp location
         # self.logger.info(f"Removing temporary files")
         # shutil.rmtree(tmp)
