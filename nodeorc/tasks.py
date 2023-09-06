@@ -1,4 +1,5 @@
 import copy
+import shutil
 import threading
 import concurrent.futures
 import logging
@@ -108,6 +109,9 @@ class LocalTaskProcessor:
             # processed_files,
             # logger=logging
     ):
+        # ensure the tmp path is in place
+        if not(os.path.isdir(self.temp_path)):
+            os.makedirs(self.temp_path)
         try:
             url, filename = os.path.split(file_path)
             cur_path = file_path
@@ -212,7 +216,10 @@ class LocalTaskProcessor:
             # find back the file and place in the failed location
             dst = os.path.join(self.failed_path, filename)
             os.rename(cur_path, dst)
-
+        finally:
+            if os.path.isdir(self.temp_path):
+                # remove any left over temporary files
+                shutil.rmtree((self.temp_path))
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
 
