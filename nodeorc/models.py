@@ -187,8 +187,9 @@ class S3Storage(Storage):
 class File(BaseModel):
     """
     Definition of the location, naming of raw result on tmp location, and in/output file name for cloud storage
+    Also defined if the result should be uploaded after processing is done or not
     """
-    remote_name: str = "video.mp4"
+    remote_name: Optional[str] = "video.mp4"
     tmp_name: str = "video.mp4"
 
     def move(self, src, trg):
@@ -311,14 +312,16 @@ class Subtask(BaseModel):
 
         """
         for k, v in self.output_files.items():
-            tmp_file = os.path.join(tmp, v.tmp_name)
-            # check if file is present
-            if not(os.path.isfile(tmp_file)):
-                raise FileNotFoundError(f"Temporary file {tmp_file} was not created by subtask")
-            with open(tmp_file, "rb") as f:
-                obj = BytesIO(f.read())
-            obj.seek(0)
-            storage.upload_io(obj, dest=v.remote_name)
+            # if remote name is None, then upload will be skipped entirely
+            if v.remote_name:
+                tmp_file = os.path.join(tmp, v.tmp_name)
+                # check if file is present
+                if not(os.path.isfile(tmp_file)):
+                    raise FileNotFoundError(f"Temporary file {tmp_file} was not created by subtask")
+                with open(tmp_file, "rb") as f:
+                    obj = BytesIO(f.read())
+                obj.seek(0)
+                storage.upload_io(obj, dest=v.remote_name)
 
 
     def execute_callback(self, callback_url, timestamp, tmp):
@@ -408,26 +411,19 @@ class Task(BaseModel):
             self.logger.info(f"Executing subtasks")
             self.execute_subtasks(tmp, timestamp=self.time)
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
-            # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if SUCCESS_PATH:
-                # move the video
-                [input_file.move(tmp, SUCCESS_PATH) for key, input_file in self.input_files.items()]
 
         except BaseException as e:
             r = self.callback_error(msg=str(e))
-            if FAILED_PATH:
-                # we move the non-succeeded video to a separate path for inspection
-                [input_file.move(tmp, FAILED_PATH) for key, input_file in self.input_files.items()]
 
-        # clean up the temp location
-        self.logger.info(f"Removing temporary files")
-        shutil.rmtree(tmp)
+        # # clean up the temp location
+        # self.logger.info(f"Removing temporary files")
+        # shutil.rmtree(tmp)
 
         # report success or error
         if r.status_code == 200:
             self.logger.info(f"Task id {str(self.id)} completed")
         else:
-            self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code}")
+            self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code} and message {r.json()}")
             raise Exception("Error detected, restarting node")
 
     def download_input(self, tmp):
@@ -458,7 +454,13 @@ class Task(BaseModel):
         """
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
-            subtask.execute(timestamp=timestamp, storage=self.storage, tmp=tmp, callback_url=self.callback_url, logger=self.logger)
+            subtask.execute(
+                timestamp=timestamp,
+                storage=self.storage,
+                tmp=tmp,
+                callback_url=self.callback_url,
+                logger=self.logger
+            )
 
     def callback_error(self, msg):
         """
@@ -540,8 +542,6 @@ class Task(BaseModel):
 
 
 class LocalConfig(BaseModel):
-    callback_url: CallbackUrl = None
-    storage: Storage = None
     incoming_path: DirectoryPath
     failed_path: DirectoryPath
     success_path: DirectoryPath
@@ -549,6 +549,7 @@ class LocalConfig(BaseModel):
     parse_dates_from_file: StrictBool = False
     video_file_fmt: str
     water_level_fmt: str
+    water_level_datetimefmt: str
 
     @field_validator("video_file_fmt")
     @classmethod
@@ -564,6 +565,26 @@ class LocalConfig(BaseModel):
         check_datetime_fmt(v)
         return v
 
+    def to_file(self, fn, indent=4, **kwargs):
+        with open(fn, "w") as f:
+            f.write(self.to_json(indent=4, **kwargs))
+
+    def to_json(self, indent=0):
+        """
+        Write task to fully serializable json format
+
+        Parameters
+        ----------
+        indent : int
+            indentation of json string (typically only used for
+
+        Returns
+        -------
+
+        """
+        return self.model_dump_json(indent=indent)
+        # load back and then store with indents
+        return task_json
 
 
 class RemoteConfig(BaseModel):

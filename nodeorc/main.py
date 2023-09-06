@@ -13,6 +13,22 @@ from dotenv import load_dotenv
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
+temp_path = os.getenv("TEMP_PATH", "./tmp")
+settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
+settings_fn = os.path.join(settings_path, "settings.json")
+task_form_fn = os.path.join(settings_path, "task_template.json")
+
+def load_settings():
+    # define local settings below
+    if os.path.isfile(settings_fn):
+        try:
+            with open(settings_fn, "r") as f:
+                settings = models.LocalConfig(**json.load(f))
+            return settings
+        except ValidationError as e:
+            raise ValueError(
+                f"Settings file in {os.path.abspath(settings_fn)} is not a valid local configuration file. Error: {e}")
+
 def validate_env(env_var):
     if os.getenv(env_var) is None:
         raise EnvironmentError(f"{env_var} is not an environment variable. Set it in an .env file or set it in your "
@@ -22,11 +38,6 @@ def validate_env(env_var):
 def validate_listen(ctx, param, value):
     if value == "AMQP":
         validate_env("AMQP_CONNECTION_STRING")
-    elif value == "local":
-        # check if settings file is set as environment variable
-        validate_env("NODEORC_SETTINGS")
-        validate_env("WATER_LEVEL_WILDCARD")
-        validate_env("VIDEO_DATETIMEFMT")
 
     return value
 
@@ -91,24 +102,23 @@ listen_opt = click.option(
 def cli(storage, listen):
     print(storage)
     logger = log.start_logger(True, False)
-    temp_path = os.getenv("TEMP_PATH", "./tmp")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
     if listen == "local":
+        settings = load_settings()
+        if settings is None:
+            raise IOError("For local processing, a settings file must be present in /settings/settings.json. Please create or modify your settings accordingly")
         # validate the settings into a task model
-        settings_fn = os.getenv("NODEORC_SETTINGS")
-        incoming_video_path = os.getenv("INCOMING_VIDEO_PATH")
-        with open(settings_fn, "r") as f:
-            task_template = json.load(f)
+        with open(task_form_fn, "r") as f:
+            task_form = json.load(f)
         # verify that task_template can be converted to a valid Task
         try:
-            task_test = models.Task(**task_template)
+            task_test = models.Task(**task_form)
         except Exception as e:
-            logger.error(f"Settings in {os.path.abspath(settings_fn)} cannot be formed into a valid Task instance")
+            logger.error(f"Task file in {os.path.abspath(task_form_fn)} cannot be formed into a valid Task instance")
         try:
-            logger.info(f"Start listening to new videos in folder {os.getenv('LOCAL_URL')}")
-            tasks.local_tasks(task_template, incoming_video_path, temp_path, logger=logger)
+            tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
         except Exception as e:
             logger.error("Reboot service: %s" % str(e))
     else:
