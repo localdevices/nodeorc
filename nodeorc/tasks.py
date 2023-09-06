@@ -239,7 +239,7 @@ def get_timestamp(
 
 
 def read_water_level_file(fn, fmt):
-    date_parser = lambda x: pd.datetime.strptime(x, fmt)
+    date_parser = lambda x: datetime.datetime.strptime(x, fmt)
     df = pd.read_csv(
         fn,
         parse_dates=True,
