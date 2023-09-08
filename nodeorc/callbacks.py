@@ -4,7 +4,7 @@ import requests
 import xarray as xr
 
 import logging as logger
-def discharge(output_files, tmp="."):
+def discharge(output_files, timestamp=None, tmp="."):
     # open the last file, which contains the transect
     fn = os.path.join(tmp, output_files["transect"].tmp_name)
     ds = xr.open_dataset(fn)
@@ -19,13 +19,14 @@ def discharge(output_files, tmp="."):
         perc_measured = np.nan * Q
     # make a json message
     msg = {
-        "h": h,
-        "q_05": Q[0],
-        "q_25": Q[1],
-        "q_50": Q[2],
-        "q_75": Q[3],
-        "q_95": Q[4],
-        "fraction_velocimetry": perc_measured[2]  # only pass the 50th percentile
+        "timestamp": timestamp.strftime("%Y%m%dT%H%M%S"),
+        "h": h if np.isfinite(h) else None,
+        "q_05": Q[0] if np.isfinite(Q[0]) else None,
+        "q_25": Q[1] if np.isfinite(Q[1]) else None,
+        "q_50": Q[2] if np.isfinite(Q[2]) else None,
+        "q_75": Q[3] if np.isfinite(Q[3]) else None,
+        "q_95": Q[4] if np.isfinite(Q[4]) else None,
+        "fraction_velocimetry": perc_measured[2] if np.isfinite(perc_measured[2]) else None  # only pass the 50th percentile
     }
     return msg
 

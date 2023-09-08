@@ -4,6 +4,7 @@ import pika
 import pyorc
 import pytest
 import requests
+import shutil
 import yaml
 
 from datetime import datetime
@@ -19,6 +20,39 @@ def prep_video_sample(video_sample_url, storage):
     print(f"Uploading {video_sample_url}")
     storage.upload_io(obj, dest=filename)
     return storage, filename
+
+
+@pytest.fixture
+def incoming_path():
+    path = "incoming"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def failed_path():
+    path = "failed"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def success_path():
+    path = "success"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
+
+@pytest.fixture
+def results_path():
+    path = "results"
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    yield path
+    shutil.rmtree(path)
 
 
 @pytest.fixture
@@ -96,7 +130,7 @@ def s3_video_sample(video_sample_url, s3storage):
     s3storage, filename = prep_video_sample(video_sample_url, s3storage)
     yield s3storage, filename
     print(f"Deleting {os.path.split(video_sample_url)[-1]}")
-    storage.bucket.objects.filter(Prefix=filename).delete()
+    s3storage.bucket.objects.filter(Prefix=filename).delete()
 
 @pytest.fixture
 def local_video_sample(video_sample_url, storage):
@@ -208,25 +242,25 @@ def output_file_cs():
 
 
 @pytest.fixture
-def subtask(callback, input_file, output_file, output_file_cs, kwargs_piv):
+def subtask(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
         callback=callback,
-        input_files={"videofile": input_file},
-        output_files={"piv": output_file, "transect": output_file_cs}
+        input_files={"videofile": models.File()},
+        output_files={"piv": models.File(), "transect": models.File()}
     )
     return obj
 
 
 @pytest.fixture
-def subtask_local(callback, input_file_local, output_file, output_file_cs, kwargs_piv):
+def subtask_local(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
         callback=callback,
-        input_files={"videofile": input_file_local},
-        output_files={"piv": output_file, "transect": output_file_cs}
+        input_files={"videofile": models.File()},
+        output_files={"piv": models.File(), "transect": models.File()}
     )
     return obj
 
@@ -235,6 +269,7 @@ def subtask_local(callback, input_file_local, output_file, output_file_cs, kwarg
 def kwargs_piv(camconfig, recipe, temp_path):
     kwargs = {
         "videofile": "video.mp4",
+        "h_a": 0.0,
         "cameraconfig": camconfig,
         "recipe": recipe,
         "output": os.path.join(temp_path, "OUTPUT"),
@@ -245,26 +280,36 @@ def kwargs_piv(camconfig, recipe, temp_path):
 
 
 @pytest.fixture
-def task(callback_url, s3storage, subtask, input_file, input_file_cs, logger):
+def task(callback_url, s3storage, subtask, input_file, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=s3storage,
         subtasks=[subtask],
-        input_files=[input_file, input_file_cs],
+        input_files={"videofile": input_file},
+        output_files={"piv": output_file, "transect": output_file_cs},
         logger=logger
         # files that are needed to perform any subtask
     )
     return obj
 
 @pytest.fixture
-def task_local(callback_url, storage, subtask_local, input_file_local, logger):
+def task_local(
+        callback_url,
+        storage,
+        subtask_local,
+        input_file_local,
+        output_file,
+        output_file_cs,
+        logger
+):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
         storage=storage,
         subtasks=[subtask_local],
-        input_files=[input_file_local],
+        input_files={"videofile": input_file_local},
+        output_files={"piv": output_file, "transect": output_file_cs},
         logger=logger
         # files that are needed to perform any subtask
     )
