@@ -30,13 +30,13 @@ install_dependencies () {
     then
         echo "CentOS system detected, running yum"
 	sudo yum -y update
-	sudo yum install ffmpeg libsm6 libxext6 libgl1 -y
-    elif [[ `hostnamectl` =~ .*"Ubuntu".* ]] || [[ `hostnamectl` =~ .*"pop-os".* ]];
+	sudo yum install ffmpeg libsm6 libxext6 libgl1 python3-venv -y
+    elif [[ `hostnamectl` =~ .*"Ubuntu".* ]] || [[ `hostnamectl` =~ .*"pop-os".* ]] || [[ `hostnamectl` =~ .*"Mint".* ]];
     then
         echo "Ubuntu-like system detected, trying apt"
         sudo apt -y update
         sudo apt -y upgrade
-        sudo apt install ffmpeg libsm6 libxext6 libgl1 -y
+        sudo apt install ffmpeg libsm6 libxext6 libgl1 python3-venv -y
     else
         echo "System unknown I can't help you with updating"
     fi
@@ -66,7 +66,7 @@ After=network.target
 
 [Service]
 User=${USER}
-WorkingDirectory=${PWD}/nodeorc
+WorkingDirectory=${PWD}
 Environment="PATH=${HOME}/venv/nodeorc/bin
 ExecStart=${HOME}/venv/nodeorc/bin/nodeorc --storage local --listen local
 Restart=always
