@@ -48,11 +48,11 @@ install_nodeorc () {
     echo 'INSTALLING NODEOPENRIVERCAM'
     echo '################################'
         pip3 install virtualenv
-        python3 -m venv $HOME/nodeorc
+        python3 -m venv $HOME/venv/nodeorc
         # activate the new environment
-        source $HOME/nodeorc/bin/activate
+        source $HOME/venv/nodeorc/bin/activate
         # install the current source code
-        pip install -e .
+        pip install .
 }
 
 install_service () {
@@ -66,9 +66,9 @@ After=network.target
 
 [Service]
 User=${USER}
-WorkingDirectory=${PWD}
-Environment="PATH=${HOME}/nodeorc/bin
-ExecStart=${HOME}/nodeorc/bin/nodeorc --storage local --listen local
+WorkingDirectory=${PWD}/nodeorc
+Environment="PATH=${HOME}/venv/nodeorc/bin
+ExecStart=${HOME}/venv/nodeorc/bin/nodeorc --storage local --listen local
 Restart=always
 
 [Install]

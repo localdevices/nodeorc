@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 temp_path = os.getenv("TEMP_PATH", "./tmp")
-settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
+settings_path = os.path.join(os.getcwd(), "settings")
+# settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 def load_settings(settings_fn):
     # define local settings below
