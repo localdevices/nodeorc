@@ -1,4 +1,5 @@
 import copy
+import dask
 import shutil
 import threading
 import concurrent.futures
@@ -10,6 +11,7 @@ import time
 import datetime
 from . import models
 import pandas as pd
+from dask.distributed import Client
 
 REPLACE_ARGS = ["input_files", "output_files", "storage"]
 class LocalTaskProcessor:
@@ -40,26 +42,17 @@ class LocalTaskProcessor:
         self.water_level_datetimefmt = water_level_datetimefmt
         self.max_workers = max_workers
         self.logger = logger
+        # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-
         self.logger.info(f"Start listening to new videos in folder {self.incoming_path}")
         self.event = threading.Event()
 
-        # make a list for processed files or files that are being processed so that they are not duplicated
-        processed_files = set()
+
+
 
         # Create and start the thread
         self.thread = threading.Thread(
             target=self.await_task,
-            # args=(
-                # self.incoming_path,
-                # self.temp_path,
-                # task_form,
-                # self.logger,
-                # self.processed_files,
-                # nodeorc_event,
-                # 2
-            # )
         )
         self.thread.start()
         try:
@@ -75,7 +68,6 @@ class LocalTaskProcessor:
         self.logger.info("Program terminated.")
 
 
-
     def await_task(self):
         # Get the number of available CPU cores
         max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
@@ -89,10 +81,6 @@ class LocalTaskProcessor:
                         executor.submit(
                             self.process_file,
                             file_path,
-                            # self.temp_path,
-                            # self.task_form,
-                            # self.processed_files,
-                            # self.logger
                         )
                         # make sure the file is in the list of processed files to ensure the task is not
                         # duplicated to another thread instance
@@ -104,10 +92,6 @@ class LocalTaskProcessor:
     def process_file(
             self,
             file_path,
-            # temp_path,
-            # task_form,
-            # processed_files,
-            # logger=logging
     ):
         # ensure the tmp path is in place
         if not(os.path.isdir(self.temp_path)):
@@ -146,30 +130,6 @@ class LocalTaskProcessor:
                 )
             except Exception as e:
                 raise ValueError(f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}")
-
-            # output_files = {
-            #     "piv": models.File(
-            #         remote_name=f"piv_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-            #         tmp_name="OUTPUT/piv.nc"
-            #     ),
-            #     "piv_mask": models.File(
-            #         remote_name=f"piv_mask_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-            #         tmp_name="OUTPUT/piv_mask.nc"
-            #     ),
-            #     "transect": models.File(
-            #         remote_name=f"transect_1_{timestamp.strftime('%Y%m%dT%H%M%S')}.nc",
-            #         tmp_name="OUTPUT/transect_transect_1.nc"
-            #     ),
-            #     "jpg": models.File(
-            #         remote_name=f"plot_quiver_{timestamp.strftime('%Y%m%dT%H%M%S')}.jpg",
-            #         tmp_name="OUTPUT/plot_quiver.jpg"
-            #     ),
-            #     "output": models.File(
-            #         remote_name=None,
-            #         tmp_name="OUTPUT"
-            #     ),
-            #
-            # }
             task_form = copy.deepcopy(self.task_form)
             # prepare input_files field in task definition
             input_files = {

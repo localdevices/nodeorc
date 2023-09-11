@@ -131,7 +131,8 @@ def cli(storage, listen, settings, task_form):
         except Exception as e:
             logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance")
         try:
-            tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
+            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
+            processor.await_task()
         except Exception as e:
             logger.error("Reboot service: %s" % str(e))
     else:

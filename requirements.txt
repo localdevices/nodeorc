@@ -5,3 +5,4 @@ pika
 pydantic==2.3.0
 pyopenrivercam
 python-dotenv
+dask[distributed]
