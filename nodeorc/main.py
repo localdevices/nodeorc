@@ -9,12 +9,11 @@ from nodeorc import log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
-
+from nodeorc import settings_path
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
 temp_path = os.getenv("TEMP_PATH", "./tmp")
-settings_path = os.path.join(os.getcwd(), "settings")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 def load_settings(settings_fn):
@@ -129,7 +128,7 @@ def cli(storage, listen, settings, task_form):
         try:
             task_test = models.Task(**task_form)
         except Exception as e:
-            logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance")
+            logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
         try:
             processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
             processor.await_task()
