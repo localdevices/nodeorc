@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-REMOVE_FOR_TEMPLATE = ["input_files", "id", "time", "callback_url", "storage"]
+REMOVE_FOR_TEMPLATE = ["input_files", "id", "timestamp", "callback_url", "storage"]
 
 def check_datetime_fmt(fn_fmt):
     # check string within {}, see if that can be parsed to datetime

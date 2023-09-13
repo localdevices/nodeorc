@@ -246,7 +246,7 @@ def subtask(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
-        callback=callback,
+        callbacks=[callback],
         input_files={"videofile": models.File()},
         output_files={"piv": models.File(), "transect": models.File()}
     )
@@ -258,7 +258,7 @@ def subtask_local(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
-        callback=callback,
+        callbacks=[callback],
         input_files={"videofile": models.File()},
         output_files={"piv": models.File(), "transect": models.File()}
     )

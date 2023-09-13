@@ -4,6 +4,7 @@ from pydantic import field_validator, BaseModel
 
 # nodeodm specific imports
 from nodeorc import callbacks
+
 class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
     request_type: str = "POST"
@@ -17,3 +18,9 @@ class Callback(BaseModel):
             raise ValueError(f"callback {v} not available in callbacks")
         return v
 
+
+    def get_body(self, task, subtask, tmp="."):
+        # get the name of callback
+        func = getattr(callbacks, self.func_name)
+        json, files = func(task, subtask, tmp=tmp, **self.kwargs)
+        return json, files

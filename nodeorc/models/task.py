@@ -16,7 +16,7 @@ class Task(BaseModel):
     Definition of an entire task
     """
     id: str = str(uuid.uuid4())
-    time: datetime = datetime.now()
+    timestamp: datetime = datetime.now()
     callback_url: Optional[CallbackUrl] = None
     callback_endpoint_error: str = "/processing/examplevideo/error"
     callback_endpoint_complete: str = "/processing/examplevideo/complete"
@@ -62,12 +62,12 @@ class Task(BaseModel):
             os.makedirs(tmp)
         # first download the input files
         try:
-            self.logger.info(f"Performing task defined at {self.time} with id {self.id}")
+            self.logger.info(f"Performing task defined at {self.timestamp} with id {self.id}")
             self.logger.info(f"Downloading all inputs to {tmp}")
             self.download_input(tmp)
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
-            self.execute_subtasks(tmp, timestamp=self.time)
+            self.execute_subtasks(tmp, timestamp=self.timestamp)
             r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
 
         except BaseException as e:
@@ -115,10 +115,11 @@ class Task(BaseModel):
         for subtask in self.subtasks:
             # execute the subtask, ensuring that the storage and bucket are known
             subtask.execute(
-                timestamp=timestamp,
-                storage=self.storage,
+                # timestamp=timestamp,
+                # storage=self.storage,
                 tmp=tmp,
-                callback_url=self.callback_url,
+                task=self,
+                # callback_url=self.callback_url,
                 logger=self.logger
             )
 

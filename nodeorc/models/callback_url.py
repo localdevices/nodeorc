@@ -1,17 +1,11 @@
-import copy
 import json
-import logging
 import os
 import requests
-import shutil
-import uuid
-from datetime import datetime
-from typing import List, Optional, Dict, Any, AnyStr, Union
-from pydantic import field_validator, BaseModel, AnyHttpUrl, ConfigDict, model_validator, DirectoryPath, StrictBool
-from pyorc import service
-from io import BytesIO
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from pydantic import field_validator, BaseModel, AnyHttpUrl, model_validator
 # nodeodm specific imports
-from nodeorc import callbacks, utils
+from nodeorc import callbacks
 from urllib.parse import urljoin
 from urllib.error import HTTPError
 
@@ -40,7 +34,7 @@ class CallbackUrl(BaseModel):
     token_refresh_end_point: Optional[str] = None
     token_refresh: Optional[str] = None
     token_access: Optional[str] = None
-    token_expiration: Optional[datetime] = datetime(2000, 1, 1, 0, 0, 0)
+    token_expiration: Optional[datetime] = datetime.now()
 
     # @field_validator("url")
     # @classmethod
@@ -65,18 +59,25 @@ class CallbackUrl(BaseModel):
         -------
 
         """
-        if self.token_refresh and self.token_refresh_end_point:
+        if self.has_token:
             # if the token is stored in a file, then it is assumed that this file contains the most actual CallbackUrl
             # for this server, and the entire instance will be replaced
             if os.path.isfile(self.token_file):
                 # read contents into a new instance and return that instead of self
                 with open(self.token_file, "r") as f:
-                    return CallbackUrl(**json.loads(f.read()))
+                    cb_dict = json.loads(f.read())
+                self.token_expiration = datetime.strptime(cb_dict["token_expiration"], "%Y-%m-%dT%H:%M:%S.%f")
+                self.token_access = cb_dict["token_access"]
+                self.token_refresh = cb_dict["token_refresh"]
         return self
 
     @property
     def token_file(self):
         return os.path.join(settings_path, self.server_name + ".json")
+
+    @property
+    def has_token(self):
+        return self.token_refresh is not None and len(self.token_refresh_end_point) > 0
 
     def to_json(self, **kwargs):
         """
@@ -101,14 +102,16 @@ class CallbackUrl(BaseModel):
 
 
     def refresh_tokens(self):
-        url = self.url + self.token_refresh_endpoint
+        url = urljoin(str(self.url), self.token_refresh_end_point)
         body = {"refresh": self.token_refresh}
         r = requests.post(url, json=body)
         if r.status_code != 200:
             raise HTTPError(f"Error code: {r.status_code}, message: {r.json()}")
         self.token_access = r.json()["access"]
         self.token_refresh = r.json()["refresh"]
+        self.token_expiration = datetime.now() + timedelta(hours=5)  # TODO: make configurable. LiveORC works with 6 hours.
         # store the tokens in file
+        self.store_tokens()
 
     def store_tokens(self):
         """
@@ -120,5 +123,27 @@ class CallbackUrl(BaseModel):
         """
         self.to_file(fn=self.token_file, indent=4)
 
-    def request(self):
-        raise NotImplementedError
+    def send_request(self, callback, json, files):
+        if self.has_token:
+            # first check if tokens must be refreshed
+            if datetime.now() > self.token_expiration:
+                # first refresh tokens
+                self.refresh_tokens()
+            headers = {"Authorization": f"Bearer {self.token_access}"}
+        else:
+            headers = {}
+        url = urljoin(str(self.url), callback.endpoint)
+        request = getattr(
+            requests,
+            callback.request_type.lower()
+        )
+        # perform callback (arrange the adding of token)
+        r = request(
+            url,
+            data=json,
+            headers=headers,
+            files=files
+        )
+        if r.status_code != 200 and r.status_code != 201:
+            raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
+
