@@ -149,7 +149,7 @@ class LocalTaskProcessor:
                 if repl_arg in task_form:
                     del task_form[repl_arg]
             task = models.Task(
-                time=timestamp,
+                timestamp=timestamp,
                 storage=storage,
                 input_files=input_files,
                 output_files=output_files,

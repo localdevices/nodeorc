@@ -19,7 +19,8 @@ def test_local_config(
         results_path=results_path,
         parse_dates_from_file=True,
         video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
-        water_level_fmt="water_level/wl_{%Y%m%d}.csv"
+        water_level_fmt="water_level/wl_{%Y%m%d}.csv",
+        water_level_datetimefmt="%Y%m%dT%H%M%S"
     )
     print("success")
 

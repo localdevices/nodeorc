@@ -246,7 +246,7 @@ def subtask(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
-        callback=callback,
+        callbacks=[callback],
         input_files={"videofile": models.File()},
         output_files={"piv": models.File(), "transect": models.File()}
     )
@@ -258,7 +258,7 @@ def subtask_local(callback, kwargs_piv):
     obj = models.Subtask(
         name="velocity_flow",
         kwargs=kwargs_piv,
-        callback=callback,
+        callbacks=[callback],
         input_files={"videofile": models.File()},
         output_files={"piv": models.File(), "transect": models.File()}
     )
@@ -280,7 +280,7 @@ def kwargs_piv(camconfig, recipe, temp_path):
 
 
 @pytest.fixture
-def task(callback_url, s3storage, subtask, input_file, logger):
+def task(callback_url, s3storage, subtask, input_file, output_file, output_file_cs, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,
