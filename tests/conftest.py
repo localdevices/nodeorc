@@ -280,7 +280,7 @@ def kwargs_piv(camconfig, recipe, temp_path):
 
 
 @pytest.fixture
-def task(callback_url, s3storage, subtask, input_file, logger):
+def task(callback_url, s3storage, subtask, input_file, output_file, output_file_cs, logger):
     obj = models.Task(
         time=datetime.now(),
         callback_url=callback_url,

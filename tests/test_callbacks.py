@@ -7,6 +7,7 @@ def test_discharge(callback_url, callback):
     r = request(
         url,
         json={
+            "timestamp": "2000-01-01T00:00:00Z",
             "h": 1.,
             "q_05": 5,
             "q_25": 6,
