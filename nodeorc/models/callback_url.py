@@ -7,9 +7,10 @@ from pydantic import field_validator, BaseModel, AnyHttpUrl, model_validator
 # nodeodm specific imports
 from nodeorc import callbacks
 from urllib.parse import urljoin
-from urllib.error import HTTPError
 
 from nodeorc import settings_path
+
+
 class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
     request_type: str = "POST"
@@ -106,7 +107,7 @@ class CallbackUrl(BaseModel):
         body = {"refresh": self.token_refresh}
         r = requests.post(url, json=body)
         if r.status_code != 200:
-            raise HTTPError(f"Error code: {r.status_code}, message: {r.json()}")
+            raise ValueError(f"Refresh token not accepted with error code {r.status_code}, message: {r.json()}")
         self.token_access = r.json()["access"]
         self.token_refresh = r.json()["refresh"]
         self.token_expiration = datetime.now() + timedelta(hours=5)  # TODO: make configurable. LiveORC works with 6 hours.

@@ -67,7 +67,7 @@ After=network.target
 [Service]
 User=${USER}
 WorkingDirectory=${PWD}
-Environment="PATH=${HOME}/venv/nodeorc/bin
+Environment="PATH=${HOME}/venv/nodeorc/bin"
 ExecStart=${HOME}/venv/nodeorc/bin/nodeorc --storage local --listen local
 Restart=always
 

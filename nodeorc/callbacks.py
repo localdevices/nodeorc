@@ -27,7 +27,7 @@ def discharge(task, subtask, tmp=".", **kwargs):
         perc_measured = np.nan * Q
     # make a json message
     msg = {
-        "timestamp": task.timestamp.strftime("%Y%m%dT%H%M%SZ"),
+        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "h": h if np.isfinite(h) else None,
         "q_05": Q[0] if np.isfinite(Q[0]) else None,
         "q_25": Q[1] if np.isfinite(Q[1]) else None,
@@ -65,7 +65,7 @@ def video(task, subtask, tmp=".", **kwargs):
         "image": (img_name, open(img_fn, "rb"))
     }
     msg = {
-        "timestamp": task.timestamp.strftime("%Y%m%dT%H%M%SZ"),
+        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": 4,
     }
     msg = {**msg, **kwargs}
