@@ -2,7 +2,6 @@ import numpy as np
 import os
 import requests
 import xarray as xr
-
 import logging as logger
 
 # all functions in this files are meant to create callbacks for end points

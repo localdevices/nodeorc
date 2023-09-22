@@ -1,4 +1,4 @@
-
+import json
 from typing import Optional, Dict, Any
 from pydantic import field_validator, BaseModel
 
@@ -22,5 +22,5 @@ class Callback(BaseModel):
     def get_body(self, task, subtask, tmp="."):
         # get the name of callback
         func = getattr(callbacks, self.func_name)
-        json, files = func(task, subtask, tmp=tmp, **self.kwargs)
-        return json, files
+        data, files = func(task, subtask, tmp=tmp, **self.kwargs)
+        return data, files

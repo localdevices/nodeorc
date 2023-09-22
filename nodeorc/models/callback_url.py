@@ -124,7 +124,7 @@ class CallbackUrl(BaseModel):
         """
         self.to_file(fn=self.token_file, indent=4)
 
-    def send_request(self, callback, json, files):
+    def send_request(self, callback, data, files):
         if self.has_token:
             # first check if tokens must be refreshed
             if datetime.now() > self.token_expiration:
@@ -141,10 +141,13 @@ class CallbackUrl(BaseModel):
         # perform callback (arrange the adding of token)
         r = request(
             url,
-            data=json,
+            data=data,
             headers=headers,
             files=files
         )
         if r.status_code != 200 and r.status_code != 201:
-            raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
+            try:
+                raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
+            except:
+                raise ValueError(f"callback to {url} failed with error code {r.status_code}, body not interpretable as JSON")
 

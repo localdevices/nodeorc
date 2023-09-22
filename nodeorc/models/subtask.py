@@ -129,7 +129,7 @@ class Subtask(BaseModel):
         # get the name of callback
         for callback in self.callbacks:
             task.logger.info(f"Sending {callback.func_name} callback to {str(task.callback_url.url) + callback.endpoint}")
-            json, files = callback.get_body(
+            data, files = callback.get_body(
                 task=task,
                 subtask=self,
                 tmp=tmp
@@ -140,7 +140,7 @@ class Subtask(BaseModel):
 
             # get the type of request. Typically this is POST for an entirely new time series record created from an edge
             # device, and PATCH for an existing record that must be provided with analyzed flows
-            task.callback_url.send_request(callback, json, files)
+            task.callback_url.send_request(callback, data, files)
 
             # request = getattr(
             #     requests,
