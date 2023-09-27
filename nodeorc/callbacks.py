@@ -71,6 +71,19 @@ def video(task, subtask, tmp=".", **kwargs):
 
     return msg, files
 
+def video_no_file(task, subtask, tmp=".", **kwargs):
+    img_fn = os.path.join(tmp, subtask.output_files["jpg"].tmp_name)
+    img_name = subtask.output_files["jpg"].remote_name
+    files = {
+        "image": (img_name, open(img_fn, "rb"))
+    }
+    msg = {
+        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": 4,
+    }
+    msg = {**msg, **kwargs}
+    return msg, files
+
 
 
 def file_not_found(base_url, endpoint, task, fn, logger=logger):
