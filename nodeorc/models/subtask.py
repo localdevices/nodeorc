@@ -128,7 +128,8 @@ class Subtask(BaseModel):
     def execute_callbacks(self, task, tmp): # callback_url, timestamp, tmp):
         # get the name of callback
         for callback in self.callbacks:
-            task.logger.info(f"Sending {callback.func_name} callback to {str(task.callback_url.url) + callback.endpoint}")
+            url = urljoin(str(task.callback_url.url), callback.endpoint)
+            task.logger.info(f"Sending {callback.func_name} callback to {url}")
             data, files = callback.get_body(
                 task=task,
                 subtask=self,

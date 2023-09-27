@@ -14,6 +14,20 @@ import pandas as pd
 from dask.distributed import Client
 
 REPLACE_ARGS = ["input_files", "output_files", "storage"]
+
+def scan_incoming(incoming, clean_empty_dirs=True):
+    file_paths = []
+    for root, paths, files in os.walk(incoming):
+        if clean_empty_dirs:
+            if len(paths) == 0 and len(files) == 0:
+                # remove the empty folder if it is not the top folder
+                if os.path.abspath(root) != os.path.abspath(incoming):
+                    os.rmdir(root)
+        for f in files:
+            file_paths.append(os.path.join(root, f))
+    return file_paths
+
+
 class LocalTaskProcessor:
     def __init__(
             self,
@@ -73,8 +87,10 @@ class LocalTaskProcessor:
         max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                for filename in os.listdir(self.incoming_path):
-                    file_path = os.path.join(self.incoming_path, filename)
+                file_paths = scan_incoming(self.incoming_path)
+                for file_path in file_paths:
+                # for filename in os.listdir(self.incoming_path):
+                #     file_path = os.path.join(self.incoming_path, filename)
                     if os.path.isfile(file_path) and file_path not in self.processed_files:
                         print(f"Found file: {file_path}")
                         # Submit the file processing task to the thread pool
@@ -87,7 +103,7 @@ class LocalTaskProcessor:
                         self.processed_files.add(file_path)
                         # # Optionally, you can move or delete the processed file, usually not needed
                         # os.remove(file_path)
-                time.sleep(1)  # wait for a sec before re-investigating the monitored folder for new files
+                time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
 
     def process_file(
             self,
@@ -116,11 +132,20 @@ class LocalTaskProcessor:
                 bucket_name=timestamp.strftime("%Y%m%d")
             )
             # move the file to the intended bucket
-            if not os.path.isdir(storage.bucket):
+            if not(os.path.isdir(storage.bucket)):
                 os.makedirs(storage.bucket)
             os.rename(file_path, os.path.join(storage.bucket, filename))
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
+            # # remove the empty folder if not equal to incoming path
+            # file_dir = os.path.split(file_path)[0]
+            # while os.path.abspath(file_dir) != os.path.abspath(self.incoming_path):
+            #     # see if folder is empty and if so remove it.
+            #     if len(os.listdir(file_dir)) == 0:
+            #         shutil.rmtree(file_dir)
+            #     # go one folder up and check
+            #     file_dir = os.path.split(file_dir)[0]
+
             # collect water level
             try:
                 h_a = get_water_level(
@@ -180,8 +205,8 @@ class LocalTaskProcessor:
             if os.path.isdir(self.temp_path):
                 # remove any left over temporary files
                 shutil.rmtree((self.temp_path))
-        # once done, the file is removed from list of considered files for processing
-        self.processed_files.remove(file_path)
+            # once done, the file is removed from list of considered files for processing
+            self.processed_files.remove(file_path)
 
 
 def get_timestamp(

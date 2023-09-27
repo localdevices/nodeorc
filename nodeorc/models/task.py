@@ -68,11 +68,11 @@ class Task(BaseModel):
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
             self.execute_subtasks(tmp, timestamp=self.timestamp)
-            r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
-
+            # r = self.callback_complete(msg=f"Task complete, id: {str(self.id)}")
+            self.logger.info(f"Task id {str(self.id)} completed")
         except BaseException as e:
-            r = self.callback_error(msg=str(e))
-            msg = f"Error in processing of subtask. Reason: {str(e)}"
+            # r = self.callback_error(msg=str(e))
+            msg = f"Error in processing of subtask {str(self.id)}. Reason: {str(e)}"
             self.logger.error(msg)
             raise Exception(msg)
         # # clean up the temp location
@@ -80,11 +80,10 @@ class Task(BaseModel):
         # shutil.rmtree(tmp)
 
         # report success or error
-        if r.status_code == 200:
-            self.logger.info(f"Task id {str(self.id)} completed")
-        else:
-            self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code} and message {r.json()}")
-            raise Exception("Error detected, restarting node")
+        # if r.status_code == 200:
+        # else:
+        #     self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code} and message {r.json()}")
+        #     raise Exception("Error detected, restarting node")
 
     def download_input(self, tmp):
         """
