@@ -195,7 +195,12 @@ def get_timestamp(
         prefix, suffix = fn_template.split("{}")
         if not(prefix in fn) or not(suffix in fn):
             raise ValueError(f"File naming of video {fn} does not follow the template {fn_fmt}. . Please change settings.json")
-        timestr = fn.split(prefix)[1].split(suffix)[0]
+        if len(prefix) > 0:
+            timestr = fn.split(prefix)[1]
+        else:
+            timestr = os.path.basename(fn)
+        if len(suffix) > 0:
+            timestr = timestr.split(suffix)[0]
         try:
             timestamp = datetime.datetime.strptime(timestr, datetime_fmt)
         except:
