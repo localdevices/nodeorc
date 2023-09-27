@@ -15,7 +15,7 @@ from dask.distributed import Client
 
 REPLACE_ARGS = ["input_files", "output_files", "storage"]
 
-def scan_incoming(incoming, clean_empty_dirs=True):
+def scan_incoming(incoming, clean_empty_dirs=True, suffix=None):
     file_paths = []
     for root, paths, files in os.walk(incoming):
         if clean_empty_dirs:
@@ -24,7 +24,10 @@ def scan_incoming(incoming, clean_empty_dirs=True):
                 if os.path.abspath(root) != os.path.abspath(incoming):
                     os.rmdir(root)
         for f in files:
-            file_paths.append(os.path.join(root, f))
+            full_path = os.path.join(root, f)
+            if suffix is not None:
+                if full_path[-len(suffix):] == suffix:
+                    file_paths.append(full_path)
     return file_paths
 
 
@@ -52,6 +55,7 @@ class LocalTaskProcessor:
         self.results_path = results_path
         self.parse_dates_from_file = parse_dates_from_file
         self.video_file_fmt = video_file_fmt
+        self.video_file_ext = video_file_fmt.split(".")[-1]
         self.water_level_ftm = water_level_fmt
         self.water_level_datetimefmt = water_level_datetimefmt
         self.max_workers = max_workers
@@ -87,7 +91,7 @@ class LocalTaskProcessor:
         max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                file_paths = scan_incoming(self.incoming_path)
+                file_paths = scan_incoming(self.incoming_path, suffix=self.video_file_ext)
                 for file_path in file_paths:
                 # for filename in os.listdir(self.incoming_path):
                 #     file_path = os.path.join(self.incoming_path, filename)
