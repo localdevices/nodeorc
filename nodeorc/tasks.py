@@ -9,6 +9,7 @@ import numpy as np
 import os
 import time
 import datetime
+
 from . import models
 import pandas as pd
 from dask.distributed import Client
@@ -44,6 +45,7 @@ class LocalTaskProcessor:
             video_file_fmt: str,
             water_level_fmt: str,
             water_level_datetimefmt: str,
+            allowed_dt: float,
             max_workers: int = 1,
             logger=logging,
     ):
@@ -58,6 +60,7 @@ class LocalTaskProcessor:
         self.video_file_ext = video_file_fmt.split(".")[-1]
         self.water_level_ftm = water_level_fmt
         self.water_level_datetimefmt = water_level_datetimefmt
+        self.allowed_dt = allowed_dt
         self.max_workers = max_workers
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
@@ -125,7 +128,7 @@ class LocalTaskProcessor:
                 timestamp = get_timestamp(
                     file_path,
                     parse_from_fn=self.parse_dates_from_file,
-                    fn_fmt=self.video_file_fmt
+                    fn_fmt=self.video_file_fmt,
                 )
             except Exception as e:
                 raise ValueError(f"Could not get a logical timestamp from file {file_path}. Reason: {e}")
@@ -155,7 +158,8 @@ class LocalTaskProcessor:
                 h_a = get_water_level(
                     timestamp,
                     file_fmt=self.water_level_ftm,
-                    datetime_fmt=self.water_level_datetimefmt
+                    datetime_fmt=self.water_level_datetimefmt,
+                    allowed_dt=self.allowed_dt
                 )
             except Exception as e:
                 raise ValueError(f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}")
@@ -258,15 +262,23 @@ def get_water_level(
     timestamp,
     file_fmt,
     datetime_fmt,
+    allowed_dt=None,
 
 ):
     datetimefmt = file_fmt.split("{")[1].split("}")[0]
     water_level_template = file_fmt.replace(datetimefmt, ":s")
     water_level_fn = water_level_template.format(timestamp.strftime(datetimefmt))
+    if not(os.path.isfile(water_level_fn)):
+        raise IOError(f"water level file {os.path.abspath(water_level_fn)} does not exist.")
     df = read_water_level_file(water_level_fn, fmt=datetime_fmt)
     t = timestamp.strftime("%Y%m%d %H:%M:%S")
     # find the closest match
     i = np.minimum(np.maximum(df.index.searchsorted(t), 0), len(df) - 1)
+    # check if value is within limits of time allowed
+    if allowed_dt is not None:
+        dt_seconds = abs(df.index[i] - timestamp).total_seconds()
+        if dt_seconds > allowed_dt:
+            raise ValueError(f"Timestamp of video {timestamp} is more than {allowed_dt} seconds off from closest water level timestamp {df.index[i]}")
     h_a = df.iloc[i].values[0]
     return h_a
 

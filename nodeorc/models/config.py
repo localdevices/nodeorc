@@ -11,6 +11,7 @@ class LocalConfig(BaseModel):
     video_file_fmt: str
     water_level_fmt: str
     water_level_datetimefmt: str
+    allowed_dt: float
 
     @field_validator("video_file_fmt")
     @classmethod
