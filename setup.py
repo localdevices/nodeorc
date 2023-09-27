@@ -22,7 +22,8 @@ setup(
         "ibm-cos-sdk",
         "pyopenrivercam",
         "pydantic==2.3.0",
-        "python-dotenv"
+        "python-dotenv",
+        "dask[distributed]"
     ],
     extras_require={
         "dev": ["pytest", "pytest-cov", "pytest-lazy-fixtures"],
