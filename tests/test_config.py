@@ -20,7 +20,8 @@ def test_local_config(
         parse_dates_from_file=True,
         video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
         water_level_fmt="water_level/wl_{%Y%m%d}.csv",
-        water_level_datetimefmt="%Y%m%dT%H%M%S"
+        water_level_datetimefmt="%Y%m%dT%H%M%S",
+        allowed_dt=1800
     )
     print("success")
 
