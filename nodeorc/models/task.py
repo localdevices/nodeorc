@@ -5,7 +5,7 @@ import requests
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Union
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator, Field
 from urllib.parse import urljoin
 
 # nodeodm specific imports
@@ -15,7 +15,7 @@ class Task(BaseModel):
     """
     Definition of an entire task
     """
-    id: str = str(uuid.uuid4())
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
     timestamp: datetime = datetime.now()
     callback_url: Optional[CallbackUrl] = None
     callback_endpoint_error: str = "/processing/examplevideo/error"
@@ -159,7 +159,7 @@ class Task(BaseModel):
         with open(fn, "w") as f:
             f.write(self.to_json(indent=4, **kwargs))
 
-    def to_json(self, indent=0, template=False):
+    def to_json(self, indent=0, template=False, serialize=True):
         """
         Write task to fully serializable json format
 
@@ -176,7 +176,7 @@ class Task(BaseModel):
 
         """
         # make a copy of self before tampering with it
-        task_copy = copy.deepcopy((self))
+        task_copy = self.copy()
         if hasattr(self, "logger"):
             # remove the logger object which is not serializable
             delattr(task_copy, "logger")
@@ -184,6 +184,9 @@ class Task(BaseModel):
             # save as a template, so remove all dynamic items such as id, input files and time
             for attr in REMOVE_FOR_TEMPLATE:
                 delattr(task_copy, attr)
-        task_json = task_copy.model_dump_json(indent=indent)
+        if serialize:
+            task_json = task_copy.model_dump_json(indent=indent)
+        else:
+            task_json = task_copy.model_dump(mode="json")
         # load back and then store with indents
         return task_json
