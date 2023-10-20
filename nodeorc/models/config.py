@@ -12,6 +12,7 @@ class LocalConfig(BaseModel):
     water_level_fmt: str
     water_level_datetimefmt: str
     allowed_dt: float
+    shutdown_after_task: StrictBool = False
 
     @field_validator("video_file_fmt")
     @classmethod

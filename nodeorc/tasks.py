@@ -46,6 +46,7 @@ class LocalTaskProcessor:
             water_level_fmt: str,
             water_level_datetimefmt: str,
             allowed_dt: float,
+            shutdown_after_task: bool,
             max_workers: int = 1,
             logger=logging,
     ):
@@ -61,6 +62,7 @@ class LocalTaskProcessor:
         self.water_level_ftm = water_level_fmt
         self.water_level_datetimefmt = water_level_datetimefmt
         self.allowed_dt = allowed_dt
+        self.shutdown_after_task = shutdown_after_task
         self.max_workers = max_workers
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
@@ -215,6 +217,13 @@ class LocalTaskProcessor:
                 shutil.rmtree((self.temp_path))
             # once done, the file is removed from list of considered files for processing
             self.processed_files.remove(file_path)
+            # shutdown if configured to shutdown after task
+            self.shutdown_or_not()
+
+
+    def shutdown_or_not(self):
+        if self.shutdown_after_task:
+            os.system("/sbin/shutdown -h now")
 
 
 def get_timestamp(
