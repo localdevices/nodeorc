@@ -223,6 +223,7 @@ class LocalTaskProcessor:
 
     def shutdown_or_not(self):
         if self.shutdown_after_task:
+            self.logger.info("Task done! Shutting down...")
             os.system("/sbin/shutdown -h now")
 
 
