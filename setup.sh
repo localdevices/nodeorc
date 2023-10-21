@@ -65,7 +65,7 @@ Description=NodeOpenRiverCam operational edge or cloud compute instance
 After=network.target
 
 [Service]
-User=${USER}
+# User=${USER}
 WorkingDirectory=${PWD}
 Environment="PATH=${HOME}/venv/nodeorc/bin"
 ExecStart=${HOME}/venv/nodeorc/bin/nodeorc --storage local --listen local
@@ -84,7 +84,6 @@ echo 'moving systemd files to /etc/systemd/system'
     sudo systemctl start nodeorc.service
     sudo systemctl enable nodeorc.service
 }
-
 
 main() {
     #display parameters
