@@ -10,9 +10,13 @@ import os
 import time
 import datetime
 
-from . import models
+from . import models, disk_management
+
 import pandas as pd
 from dask.distributed import Client
+
+
+
 
 REPLACE_ARGS = ["input_files", "output_files", "storage"]
 
@@ -47,8 +51,10 @@ class LocalTaskProcessor:
             water_level_datetimefmt: str,
             allowed_dt: float,
             shutdown_after_task: bool,
+            disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
+
     ):
         self.task_form = task_form
         self.temp_path = temp_path
@@ -63,6 +69,7 @@ class LocalTaskProcessor:
         self.water_level_datetimefmt = water_level_datetimefmt
         self.allowed_dt = allowed_dt
         self.shutdown_after_task = shutdown_after_task
+        self.disk_management = disk_management
         self.max_workers = max_workers
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
@@ -94,6 +101,8 @@ class LocalTaskProcessor:
     def await_task(self):
         # Get the number of available CPU cores
         max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
+        # start the timer for the disk manager
+        disk_mng_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
                 file_paths = scan_incoming(self.incoming_path, suffix=self.video_file_ext)
@@ -110,9 +119,10 @@ class LocalTaskProcessor:
                         # make sure the file is in the list of processed files to ensure the task is not
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
-                        # # Optionally, you can move or delete the processed file, usually not needed
-                        # os.remove(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
+                if time.time() - disk_mng_t0 > self.disk_management["frequency"]:
+                    self.logger.info(f"Checking for disk space exceedance of {self.disk_management['min_free_space']}")
+                    disk_management.get_free_space(self.disk_management["home_folder"], self.logger)
 
     def process_file(
             self,
