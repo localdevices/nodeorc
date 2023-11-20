@@ -1,6 +1,7 @@
 import copy
 import dask
 import shutil
+import sys
 import threading
 import concurrent.futures
 import logging
@@ -10,27 +11,11 @@ import os
 import time
 import datetime
 
-from . import models
+from . import models, disk_management
+
 import pandas as pd
-from dask.distributed import Client
 
 REPLACE_ARGS = ["input_files", "output_files", "storage"]
-
-def scan_incoming(incoming, clean_empty_dirs=True, suffix=None):
-    file_paths = []
-    for root, paths, files in os.walk(incoming):
-        if clean_empty_dirs:
-            if len(paths) == 0 and len(files) == 0:
-                # remove the empty folder if it is not the top folder
-                if os.path.abspath(root) != os.path.abspath(incoming):
-                    os.rmdir(root)
-        for f in files:
-            full_path = os.path.join(root, f)
-            if suffix is not None:
-                if full_path[-len(suffix):] == suffix:
-                    file_paths.append(full_path)
-    return file_paths
-
 
 class LocalTaskProcessor:
     def __init__(
@@ -47,8 +32,10 @@ class LocalTaskProcessor:
             water_level_datetimefmt: str,
             allowed_dt: float,
             shutdown_after_task: bool,
+            disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
+
     ):
         self.task_form = task_form
         self.temp_path = temp_path
@@ -63,15 +50,13 @@ class LocalTaskProcessor:
         self.water_level_datetimefmt = water_level_datetimefmt
         self.allowed_dt = allowed_dt
         self.shutdown_after_task = shutdown_after_task
+        self.disk_management = disk_management
         self.max_workers = max_workers
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
         self.logger.info(f"Start listening to new videos in folder {self.incoming_path}")
         self.event = threading.Event()
-
-
-
 
         # Create and start the thread
         self.thread = threading.Thread(
@@ -94,9 +79,11 @@ class LocalTaskProcessor:
     def await_task(self):
         # Get the number of available CPU cores
         max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
+        # start the timer for the disk manager
+        disk_mng_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                file_paths = scan_incoming(self.incoming_path, suffix=self.video_file_ext)
+                file_paths = disk_management.scan_folder(self.incoming_path, suffix=self.video_file_ext)
                 for file_path in file_paths:
                 # for filename in os.listdir(self.incoming_path):
                 #     file_path = os.path.join(self.incoming_path, filename)
@@ -110,9 +97,55 @@ class LocalTaskProcessor:
                         # make sure the file is in the list of processed files to ensure the task is not
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
-                        # # Optionally, you can move or delete the processed file, usually not needed
-                        # os.remove(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
+                if time.time() - disk_mng_t0 > self.disk_management["frequency"]:
+                    # reset the disk management t0 counter
+                    disk_mng_t0 = time.time()
+                    self.logger.info(
+                        f"Checking for disk space exceedance of {self.disk_management['min_free_space']}"
+                    )
+                    free_space = disk_management.get_free_space(
+                        self.disk_management["home_folder"]
+                    )
+                    if free_space < self.disk_management["min_free_space"]:
+                        ret = disk_management.purge(
+                            [
+                                self.success_path,
+                                self.failed_path,
+                            ],
+                            free_space=free_space,
+                            min_free_space=self.disk_management["min_free_space"],
+                            logger=self.logger,
+                            home=self.disk_management["home_folder"]
+                        )
+                        # if returned is False then continue purging the results path
+                        if not(ret):
+                            self.logger.warning(f"Space after purging still not enough, purging results folder")
+                            ret = disk_management.purge(
+                                [
+                                    self.results_path
+                                ],
+                                free_space=free_space,
+                                min_free_space=self.disk_management["min_free_space"],
+                                logger=self.logger,
+                                home=self.disk_management["home_folder"]
+                            )
+                        if not(ret):
+                            self.logger.warning(f"Not enough space freed up. Checking for critical space.")
+                            # final computation of free space
+                            free_space = disk_management.get_free_space(
+                                self.disk_management["home_folder"],
+                            )
+                            if free_space < self.disk_management["critical_space"]:
+                                # shutdown the service to secure the device!
+                                self.logger.error(
+                                    f"Free space is under critical threshold of {self.disk_management['critical_space']}. Shutting down NodeORC service"
+                                )
+                                os.system("/usr/bin/systemctl disable nodeorc")
+                                os.system("/usr/bin/systemctl stop nodeorc")
+                                sys.exit(1)
+                            else:
+                                self.logger.warning(f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
 
     def process_file(
             self,

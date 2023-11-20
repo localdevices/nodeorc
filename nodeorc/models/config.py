@@ -2,6 +2,17 @@ from pydantic import field_validator, BaseModel, AnyHttpUrl, DirectoryPath, Stri
 
 # nodeodm specific imports
 from . import check_datetime_fmt
+
+
+class DiskManagement(BaseModel):
+    # default parameters for disk management, these will in most cases on linux systems be appropriate
+    home_folder: DirectoryPath = "/home"
+    min_free_space: float = 20  # if space is less than this threshold, files will be (re)moved.
+    critical_space: float = 10  # if space is less than this threshold, the service will shutdown immediately to
+    # prevent access problems
+    frequency: int = 86400  # frequency to check the values in seconds
+
+
 class LocalConfig(BaseModel):
     incoming_path: DirectoryPath
     failed_path: DirectoryPath
@@ -13,6 +24,7 @@ class LocalConfig(BaseModel):
     water_level_datetimefmt: str
     allowed_dt: float
     shutdown_after_task: StrictBool = False
+    disk_management: DiskManagement = DiskManagement()
 
     @field_validator("video_file_fmt")
     @classmethod
