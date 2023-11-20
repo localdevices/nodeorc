@@ -105,8 +105,7 @@ class LocalTaskProcessor:
                         f"Checking for disk space exceedance of {self.disk_management['min_free_space']}"
                     )
                     free_space = disk_management.get_free_space(
-                        self.disk_management["home_folder"],
-                        self.logger
+                        self.disk_management["home_folder"]
                     )
                     if free_space < self.disk_management["min_free_space"]:
                         ret = disk_management.purge(
@@ -136,7 +135,6 @@ class LocalTaskProcessor:
                             # final computation of free space
                             free_space = disk_management.get_free_space(
                                 self.disk_management["home_folder"],
-                                self.logger
                             )
                             if free_space < self.disk_management["critical_space"]:
                                 # shutdown the service to secure the device!

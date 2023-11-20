@@ -3,7 +3,7 @@ import os
 import shutil
 
 # functions to manage that disk space remains below a threshold
-def get_free_space(path_dir, logger):
+def get_free_space(path_dir):
     """
 
     Parameters
@@ -51,6 +51,8 @@ def scan_folder(incoming, clean_empty_dirs=True, suffix=None):
                     if os.path.abspath(root) != os.path.abspath(folder):
                         os.rmdir(root)
             for f in files:
+                if type(f) is bytes:
+                    f = f.decode()
                 full_path = os.path.join(root, f)
                 if suffix is not None:
                     if full_path[-len(suffix):] == suffix:
@@ -115,7 +117,7 @@ def purge(paths, free_space, min_free_space, logger, home="/home"):
             logger.warning(
                 f"File {fns[cur_idx]} could not be deleted, skipping..."
             )
-        free_space = get_free_space(home, logger=logger)
+        free_space = get_free_space(home)
         # continue with the next file in the list
         cur_idx += 1
     return True
