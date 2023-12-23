@@ -5,6 +5,8 @@ REMOVE_FOR_TEMPLATE = ["input_files", "id", "timestamp", "callback_url", "storag
 
 def check_datetime_fmt(fn_fmt):
     # check string within {}, see if that can be parsed to datetime
+    if not("{" in fn_fmt and "}" in fn_fmt):
+        return True
     try:
         fmt = fn_fmt.split('{')[1].split('}')[0]
     except:

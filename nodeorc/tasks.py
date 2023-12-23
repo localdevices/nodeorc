@@ -308,9 +308,13 @@ def get_water_level(
     allowed_dt=None,
 
 ):
-    datetimefmt = file_fmt.split("{")[1].split("}")[0]
-    water_level_template = file_fmt.replace(datetimefmt, ":s")
-    water_level_fn = water_level_template.format(timestamp.strftime(datetimefmt))
+    if "{" in file_fmt and "}" in file_fmt:
+        datetimefmt = file_fmt.split("{")[1].split("}")[0]
+        water_level_template = file_fmt.replace(datetimefmt, ":s")
+        water_level_fn = water_level_template.format(timestamp.strftime(datetimefmt))
+    else:
+        # there is no date pattern, so assume the fmt is already a file path
+        water_level_fn = file_fmt
     if not(os.path.isfile(water_level_fn)):
         raise IOError(f"water level file {os.path.abspath(water_level_fn)} does not exist.")
     df = read_water_level_file(water_level_fn, fmt=datetime_fmt)
@@ -321,7 +325,10 @@ def get_water_level(
     if allowed_dt is not None:
         dt_seconds = abs(df.index[i] - timestamp).total_seconds()
         if dt_seconds > allowed_dt:
-            raise ValueError(f"Timestamp of video {timestamp} is more than {allowed_dt} seconds off from closest water level timestamp {df.index[i]}")
+            raise ValueError(
+                f"Timestamp of video {timestamp} is more than {allowed_dt} seconds off from closest "
+                f"water level timestamp {df.index[i]}"
+            )
     h_a = df.iloc[i].values[0]
     return h_a
 
