@@ -147,7 +147,7 @@ class CallbackUrl(BaseModel):
         )
         if r.status_code != 200 and r.status_code != 201:
             try:
-                raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
+                raise ValueError(f'callback to {url} failed with error code {r.status_code} and body "{r.json()}"')
             except:
-                raise ValueError(f"callback to {url} failed with error code {r.status_code}, body not interpretable as JSON")
+                raise ValueError(f'callback to {url} failed with error code {r.status_code}, and text body "{r.text}"')
 
