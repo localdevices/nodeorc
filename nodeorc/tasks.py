@@ -55,6 +55,7 @@ class LocalTaskProcessor:
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
+        self.logger.info(f'Water levels will be searched for in {water_level_fmt} using a datetime format "{self.water_level_datetimefmt}"')
         self.logger.info(f"Start listening to new videos in folder {self.incoming_path}")
         self.event = threading.Event()
 
@@ -108,44 +109,60 @@ class LocalTaskProcessor:
                         self.disk_management["home_folder"]
                     )
                     if free_space < self.disk_management["min_free_space"]:
-                        ret = disk_management.purge(
-                            [
-                                self.success_path,
-                                self.failed_path,
-                            ],
-                            free_space=free_space,
-                            min_free_space=self.disk_management["min_free_space"],
-                            logger=self.logger,
-                            home=self.disk_management["home_folder"]
-                        )
-                        # if returned is False then continue purging the results path
-                        if not(ret):
-                            self.logger.warning(f"Space after purging still not enough, purging results folder")
-                            ret = disk_management.purge(
-                                [
-                                    self.results_path
-                                ],
-                                free_space=free_space,
-                                min_free_space=self.disk_management["min_free_space"],
-                                logger=self.logger,
-                                home=self.disk_management["home_folder"]
-                            )
-                        if not(ret):
-                            self.logger.warning(f"Not enough space freed up. Checking for critical space.")
-                            # final computation of free space
-                            free_space = disk_management.get_free_space(
-                                self.disk_management["home_folder"],
-                            )
-                            if free_space < self.disk_management["critical_space"]:
-                                # shutdown the service to secure the device!
-                                self.logger.error(
-                                    f"Free space is under critical threshold of {self.disk_management['critical_space']}. Shutting down NodeORC service"
-                                )
-                                os.system("/usr/bin/systemctl disable nodeorc")
-                                os.system("/usr/bin/systemctl stop nodeorc")
-                                sys.exit(1)
-                            else:
-                                self.logger.warning(f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
+                        self.cleanup_space(free_space=free_space)
+
+
+    def cleanup_space(self, free_space):
+        """
+        Free up space on disk by removing oldest files first.
+        First success and failed paths are cleaned, then results path is cleaned.
+
+        Parameters
+        ----------
+        free_space : float
+            GB amount of free space currently available
+
+        """
+        ret = disk_management.purge(
+            [
+                self.success_path,
+                self.failed_path,
+            ],
+            free_space=free_space,
+            min_free_space=self.disk_management["min_free_space"],
+            logger=self.logger,
+            home=self.disk_management["home_folder"]
+        )
+        # if returned is False then continue purging the results path
+        if not ret:
+            self.logger.warning(f"Space after purging still not enough, purging results folder")
+            ret = disk_management.purge(
+                [
+                    self.results_path
+                ],
+                free_space=free_space,
+                min_free_space=self.disk_management["min_free_space"],
+                logger=self.logger,
+                home=self.disk_management["home_folder"]
+            )
+        if not ret:
+            self.logger.warning(f"Not enough space freed up. Checking for critical space.")
+            # final computation of free space
+            free_space = disk_management.get_free_space(
+                self.disk_management["home_folder"],
+            )
+            if free_space < self.disk_management["critical_space"]:
+                # shutdown the service to secure the device!
+                self.logger.error(
+                    f"Free space is under critical threshold of {self.disk_management['critical_space']}. Shutting down NodeORC service"
+                )
+                os.system("/usr/bin/systemctl disable nodeorc")
+                os.system("/usr/bin/systemctl stop nodeorc")
+                sys.exit(1)
+            else:
+                self.logger.warning(
+                    f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
+
 
     def process_file(
             self,
@@ -166,6 +183,7 @@ class LocalTaskProcessor:
                     fn_fmt=self.video_file_fmt,
                 )
             except Exception as e:
+                timestamp = None
                 raise ValueError(f"Could not get a logical timestamp from file {file_path}. Reason: {e}")
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
@@ -179,15 +197,6 @@ class LocalTaskProcessor:
             os.rename(file_path, os.path.join(storage.bucket, filename))
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
-            # # remove the empty folder if not equal to incoming path
-            # file_dir = os.path.split(file_path)[0]
-            # while os.path.abspath(file_dir) != os.path.abspath(self.incoming_path):
-            #     # see if folder is empty and if so remove it.
-            #     if len(os.listdir(file_dir)) == 0:
-            #         shutil.rmtree(file_dir)
-            #     # go one folder up and check
-            #     file_dir = os.path.split(file_dir)[0]
-
             # collect water level
             try:
                 h_a = get_water_level(
@@ -197,7 +206,9 @@ class LocalTaskProcessor:
                     allowed_dt=self.allowed_dt
                 )
             except Exception as e:
-                raise ValueError(f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}")
+                raise ValueError(
+                    f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
+                )
             task_form = copy.deepcopy(self.task_form)
             # prepare input_files field in task definition
             input_files = {
@@ -235,23 +246,31 @@ class LocalTaskProcessor:
             task.execute(self.temp_path)
             # if the video was treated successfully, then we may move it to a location of interest if wanted
             if self.success_path:
-                # move the video
-                [input_file.move(self.temp_path, self.success_path) for key, input_file in task.input_files.items()]
-
-
+                dst_path = os.path.join(
+                    self.success_path,
+                    timestamp.strftime("%Y%m%d")
+                )
         except Exception as e:
             self.logger.error(f"Error processing {file_path}: {str(e)}")
-            # find back the file and place in the failed location
-            dst = os.path.join(self.failed_path, filename)
-            os.rename(cur_path, dst)
-        finally:
-            if os.path.isdir(self.temp_path):
-                # remove any left over temporary files
-                shutil.rmtree((self.temp_path))
-            # once done, the file is removed from list of considered files for processing
-            self.processed_files.remove(file_path)
-            # shutdown if configured to shutdown after task
-            self.shutdown_or_not()
+            # find back the file and place in the failed location, organised per day
+            if timestamp:
+                dst_path = os.path.join(self.failed_path, timestamp.strftime("%Y%m%d"))
+            else:
+                dst_path = self.failed_path
+
+        if not os.path.isdir(dst_path):
+            os.makedirs(dst_path)
+        dst = os.path.join(dst_path, filename)
+        os.rename(cur_path, dst)
+        self.logger.debug(f"Video file moved from {cur_path} to {dst_path}")
+
+        if os.path.isdir(self.temp_path):
+            # remove any left over temporary files
+            shutil.rmtree((self.temp_path))
+        # once done, the file is removed from list of considered files for processing
+        self.processed_files.remove(file_path)
+        # shutdown if configured to shutdown after task
+        self.shutdown_or_not()
 
 
     def shutdown_or_not(self):
