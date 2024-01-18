@@ -9,7 +9,7 @@ from nodeorc import log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
-from nodeorc import settings_path
+from nodeorc import settings_path, db
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 

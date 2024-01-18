@@ -1,4 +1,5 @@
 # Tests for config objects
+import db.config
 from nodeorc.models import LocalConfig
 
 def test_local_config(
@@ -25,3 +26,22 @@ def test_local_config(
     )
     print("success")
 
+
+def test_add_config(session, config):
+    """
+    Test writing of record to database
+
+    Parameters
+    ----------
+    session
+    config
+
+    Returns
+    -------
+
+    """
+    db.config.add_config(session, config, set_as_active=False)
+    # check if a record has been created (without an active record
+    assert(len(session.query(db.models.Config).all()) == 1)
+
+    # check also if a active record has been created

@@ -7,9 +7,14 @@ import requests
 import shutil
 import yaml
 
+# database specific imports
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from datetime import datetime
 from io import BytesIO, StringIO
 from nodeorc import models, utils, log
+from nodeorc.db.models import Base
 
 
 def prep_video_sample(video_sample_url, storage):
@@ -99,7 +104,6 @@ def channel():
     channel.queue_declare(queue="processing")
     yield channel
     connection.close()
-
 
 @pytest.fixture
 def recipe(recipe_url, crossection):
@@ -314,4 +318,38 @@ def task_local(
         # files that are needed to perform any subtask
     )
     return obj
+
+
+@pytest.fixture
+def config(
+    callback_url,
+    storage,
+    incoming_path,
+    success_path,
+    failed_path,
+    results_path
+):
+    return models.LocalConfig(
+        callback_url=callback_url,
+        storage=storage,
+        incoming_path=incoming_path,
+        failed_path=failed_path,
+        success_path=success_path,
+        results_path=results_path,
+        parse_dates_from_file=True,
+        video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
+        water_level_fmt="water_level/wl_{%Y%m%d}.csv",
+        water_level_datetimefmt="%Y%m%dT%H%M%S",
+        allowed_dt=1800
+    )
+
+
+@pytest.fixture
+def session():
+    engine = create_engine(f"sqlite://")
+    # make the models
+    Base.metadata.create_all(engine)
+    Session = sessionmaker()
+    Session.configure(bind=engine)
+    return Session()
 
