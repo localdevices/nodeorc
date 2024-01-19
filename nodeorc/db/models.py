@@ -15,6 +15,9 @@ class Config(Base):
         JSON, nullable=False,
         default={"url": "./tmp", "bucket_name": "examplevideo"}
     )
+    callback_url = Column(
+        JSON, nullable=True,
+    )
     incoming_path = Column(String, nullable=False)
     failed_path = Column(String, nullable=False)
     success_path = Column(String, nullable=False)
@@ -36,7 +39,13 @@ class Config(Base):
         }
     )
 
-class ActiveConfig():
+    def __str__(self):
+        return "Config {} ({})".format(self.created_at, self.id)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
+class ActiveConfig(Base):
     __tablename__ = "active_config"
     id = Column(Integer, primary_key=True)
     config_id = Column(Integer, ForeignKey("config.id"), nullable=False)
@@ -44,3 +53,9 @@ class ActiveConfig():
         "Config",
         foreign_keys=[config_id]
     )
+
+    def __str__(self):
+        return "ActiveConfig: {}".format(self.config)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())

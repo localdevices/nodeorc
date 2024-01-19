@@ -59,6 +59,13 @@ def print_license(ctx, param, value):
     click.echo(f"GNU Affero General Public License v3 (AGPLv3). See https://www.gnu.org/licenses/agpl-3.0.en.html")
     ctx.exit()
 
+def print_info(ctx, param, value):
+    if not value:
+        return {}
+    click.echo(f"NodeOpenRiverCam, Copyright Localdevices, Rainbow Sensing")
+    ctx.exit()
+
+
 
 verbose_opt = click.option("--verbose", "-v", count=True, help="Increase verbosity.")
 
@@ -104,14 +111,42 @@ task_form_opt = click.option(
 #     task.execute(temp_path)
 #     ch.basic_ack(delivery_tag=method.delivery_tag)
 #
-# @click.group()
-@click.command()
+# @click.command()
+@click.group()
 @click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
+@click.option(
+    "--license",
+    default=False,
+    is_flag=True,
+    is_eager=True,
+    help="Print license information for NodeOpenRiverCam",
+    callback=print_license,
+)
+@click.option(
+    "--info",
+    default=False,
+    is_flag=True,
+    is_eager=True,
+    help="Print information and version of NodeOpenRiverCam",
+    callback=print_info,
+)
+@click.option(
+    '--debug/--no-debug',
+    default=False,
+    envvar='REPO_DEBUG'
+)
+@click.pass_context
+def cli(ctx, info, license, debug):  # , quiet, verbose):
+    """Command line interface for pyOpenRiverCam."""
+    if ctx.obj is None:
+        ctx.obj = {}
+
+@cli.command(short_help="Start main daemon")
 @storage_opt
 @listen_opt
 @settings_opt
 @task_form_opt
-def cli(storage, listen, settings, task_form):
+def start(storage, listen, settings, task_form):
     print(storage)
     logger = log.start_logger(True, False)
     # remote storage parameters with local processing is not possible

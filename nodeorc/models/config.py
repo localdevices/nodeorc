@@ -1,19 +1,22 @@
 from pydantic import field_validator, BaseModel, AnyHttpUrl, DirectoryPath, StrictBool
-
+from pathlib import PosixPath
+from typing import Optional
 # nodeodm specific imports
 from . import check_datetime_fmt
-
+from . import Storage, CallbackUrl
 
 class DiskManagement(BaseModel):
     # default parameters for disk management, these will in most cases on linux systems be appropriate
-    home_folder: DirectoryPath = "/home"
-    min_free_space: float = 20  # if space is less than this threshold, files will be (re)moved.
-    critical_space: float = 10  # if space is less than this threshold, the service will shutdown immediately to
+    home_folder: DirectoryPath = PosixPath("/home")
+    min_free_space: float = 20.0  # if space is less than this threshold, files will be (re)moved.
+    critical_space: float = 10.0  # if space is less than this threshold, the service will shutdown immediately to
     # prevent access problems
     frequency: int = 86400  # frequency to check the values in seconds
 
 
 class LocalConfig(BaseModel):
+    storage: Storage
+    callback_url: Optional[CallbackUrl]
     incoming_path: DirectoryPath
     failed_path: DirectoryPath
     success_path: DirectoryPath

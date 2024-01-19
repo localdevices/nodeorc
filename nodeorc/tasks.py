@@ -21,6 +21,8 @@ class LocalTaskProcessor:
     def __init__(
             self,
             task_form,
+            callback_url: models.CallbackUrl,
+            storage: models.Storage,
             temp_path: str,
             incoming_path: str,
             failed_path: str,
@@ -51,6 +53,8 @@ class LocalTaskProcessor:
         self.allowed_dt = allowed_dt
         self.shutdown_after_task = shutdown_after_task
         self.disk_management = disk_management
+        self.callback_url = callback_url
+        self.storage = storage
         self.max_workers = max_workers
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
