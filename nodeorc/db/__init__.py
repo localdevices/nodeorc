@@ -6,9 +6,10 @@ from sqlalchemy.orm import sessionmaker
 from .models import Base
 from . import config
 from . import active_config
+from nodeorc import __home__
 
 db_path = os.path.join(
-    os.path.split(__file__)[0], "nodeorc.db"
+    __home__, "nodeorc.db"
 )
 
 engine = create_engine(f"sqlite:///{db_path}")

@@ -57,11 +57,13 @@ def add_replace_active_config(
         session.add(active_config_record)
     else:
         # active config already exists, replace config
-        active_config_record = active_configs.first()
+        active_config_record = get_active_config(session)
+        print(f"ID: {config_record.id}")
         active_config_record.config_id = config_record.id
+        session.add(active_config_record)
     session.commit()
 
-def get_config(config_record):
+def get_config(session, id):
     """
     Get a Config pydantic object from a stored db model
 
@@ -74,9 +76,10 @@ def get_config(config_record):
     -------
 
     """
-    config_dict =dict(config_record.__dict__)
-    # remove id and _sa_instance_state
-    config_dict.pop("_sa_instance_state")
-    config_dict.pop("id")
-    # convert into a Config object
-    return models.LocalConfig(**config_dict)
+    return session.query(db_models.Config).get(id)
+
+def get_active_config(session):
+    active_configs = session.query(db_models.ActiveConfig)
+    assert(len(active_configs.all()) == 1),\
+        'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc new_settings --help" for more information'
+    return active_configs.first().config

@@ -5,16 +5,32 @@ import pika
 import sys
 import traceback
 
-from nodeorc import log, models, tasks, __version__
+from nodeorc import db, log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
 from nodeorc import settings_path, db
+
+# globally required variables
+session = db.session
+logger = log.start_logger(True, False)
+
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
+
+def get_docs_settings():
+    fixed_fields = ["id", "created_at", "metadata", "registry"]
+    # list all attributes except internal and fixed fields
+    fields = [f for f in dir(db.models.Config) if not(f in fixed_fields) if not f.startswith("_")]
+    docs = """JSON-file should contain the following settings: \n"""
+    docs += """================================================\n\n"""
+    for f in fields:
+        attr_doc = getattr(db.models.Config, f).comment
+        docs += " {} : {}\n\n".format(f, attr_doc)
+    return docs
 
 def load_settings(settings_fn):
     # define local settings below
@@ -52,6 +68,7 @@ def validate_storage(ctx, param, value):
         # storage is defined by remote task so not relevant now
         pass
     return value
+
 
 def print_license(ctx, param, value):
     if not value:
@@ -148,7 +165,6 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 @task_form_opt
 def start(storage, listen, settings, task_form):
     print(storage)
-    logger = log.start_logger(True, False)
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
@@ -172,7 +188,29 @@ def start(storage, listen, settings, task_form):
     else:
         raise NotImplementedError
 
+@cli.command(
+    short_help="Upload a new configuration for this device from a JSON formatted file",
+    epilog=get_docs_settings()
+)
+@click.argument(
+    "JSON-file",
+    type=click.Path(resolve_path=True, dir_okay=False, file_okay=True),
+    required=True,
+)
+@click.option(
+    "-a",
+    "--set-as-active",
+    is_flag=True,
+    default=True,
+    help="Flag to define if uploaded configuration should be set as active (default: True)"
+)
+def upload_config(json_file, set_as_active):
+    """Upload a new configuration for this device from a JSON formatted file"""
+    config = load_settings(json_file)
+    rec = db.config.add_config(session, config=config, set_as_active=set_as_active)
+    logger.info(f"Record {rec} added")
 
+upload_config.__doc__ = get_docs_settings()
 # def main():
 #     connection = pika.BlockingConnection(
 #         pika.URLParameters(

@@ -59,9 +59,14 @@ def test_add_config(session, config):
     # check also if a active record has been created
     assert(len(session.query(db.models.ActiveConfig).all()) == 1)
     assert(session.query(db.models.ActiveConfig).first().config_id == 3)
-    config_record = session.query(db.models.Config).first()
-    # test if config can be retrieved
-    config_retr = db.config.get_config(config_record)
+    config_record = db.config.get_config(session, 1)
+    # turn record into a dict
+    config_dict = dict(config_record.__dict__)
+    # remove id and _sa_instance_state
+    config_dict.pop("_sa_instance_state")
+    config_dict.pop("id")
+    # convert into a Config object
+    config_retr = LocalConfig(**config_dict)
     assert(config.model_dump() == config_retr.model_dump())
     d = config_retr.model_dump()
     # test if a bad config returns and error
