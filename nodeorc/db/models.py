@@ -6,8 +6,8 @@ import datetime
 
 Base = declarative_base()
 
-class Config(Base):
-    __tablename__ = 'config'
+class Settings(Base):
+    __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -17,17 +17,6 @@ class Config(Base):
         doc="storage details",
         comment='JSON describing the storage as {"url": "<url>", "storage_bucket": "/path/to/bucket"}'
     )
-    callback_url = Column(
-        JSON, nullable=True,
-        comment='JSON describing the callback url with token as {"server_name": "<name>", "url": <url>, "token_refresh_end_point": "/token/refresh/api/endpoint", "token_access": "<jwt-access-token>", "token_refresh": "<jwt-refresh-token>"}'
-    )
-    # server_name: str = "some_server"  # required only for storing access tokens
-    # url: AnyHttpUrl = "https://127.0.0.1:8000/api"
-    # token_refresh_end_point: Optional[str] = None
-    # token_refresh: Optional[str] = None
-    # token_access: Optional[str] = None
-    # token_expiration: Optional[datetime] = datetime.now()
-
     incoming_path = Column(
         String,
         nullable=False,
@@ -93,22 +82,127 @@ class Config(Base):
     )
 
     def __str__(self):
-        return "Config {} ({})".format(self.created_at, self.id)
+        return "Settings {} ({})".format(self.created_at, self.id)
 
     def __repr__(self):
         return "{}".format(self.__str__())
 
-class ActiveConfig(Base):
-    __tablename__ = "active_config"
+
+class DiskManagement(Base):
+    __tablename__ = 'disk_management'
+
     id = Column(Integer, primary_key=True)
-    config_id = Column(Integer, ForeignKey("config.id"), nullable=False)
-    config = relationship(
-        "Config",
-        foreign_keys=[config_id]
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    home_folder = Column(
+        String,
+        default="/home",
+        comment = "Path to folder from which to scan for available disk space"
+    )
+
+    min_free_space = Column(
+        Float,
+        default=20,
+        comment="GB of minimum free space required. When space is less, cleanup will be performed"
+    )
+    critical_space = Column(
+        Float,
+        default=10,
+        comment="GB of free space under which the service will shutdown to prevent loss of contact to the device"
+    )
+    frequency = Column(
+        Float,
+        default=3600,
+        comment="Frequency [s] in which the device will be checked for available space and cleanup will occur"
     )
 
     def __str__(self):
-        return "ActiveConfig: {}".format(self.config)
+        return "DiskManagement {} ({})".format(self.created_at, self.id)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
+class CallbackUrl(Base):
+    __tablename__ = 'callback_url'
+
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    server_name = Column(
+        String,
+        comment="User defined recognizable name for server"
+    )
+    url = Column(
+        String,
+        default="https://127.0.0.1:8000/api",
+        nullable=False,
+        comment="url to api main end point of server to report to"
+    )
+    token_refresh_end_point = Column(
+        String,
+        comment="Refresh end point for JWT tokens of the server"
+    )
+    token_refresh = Column(
+        String,
+        comment="Refresh JWT token"
+    )
+    token_access = Column(
+        String,
+        comment="JWT token"
+    )
+    token_expiration = Column(
+        DateTime,
+        comment="Date time of moment of expiry of refresh token"
+    )
+    def __str__(self):
+        return "CallbackUrl {} ({})".format(self.created_at, self.id)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
+
+class Storage(Base):
+    __tablename__ = "storage"
+    url = Column(
+        String,
+        default="./tmp",
+        comment="Path to temporary folder for processing"
+    )
+    bucket_name = Column(
+        String,
+        default="examplevideo",
+        comment="subfolder of bucket"
+    )
+    def __str__(self):
+        return "Storage {} ({})".format(self.created_at, self.id)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
+
+class ActiveConfig(Base):
+    __tablename__ = "active_config"
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey("settings.id"), nullable=False)
+    callback_url_id = Column(Integer, ForeignKey("callback_url.id"), nullable=False)
+    disk_management_id = Column(Integer, ForeignKey("disk_management.id"), nullable=False)
+    storage_id = Column(Integer, ForeignKey("storage.id"), nullable=False)
+    settings = relationship(
+        "Settings",
+        foreign_keys=[settings_id]
+    )
+    disk_management = relationship(
+        "DiskManagement",
+        foreign_keys=[disk_management_id]
+    )
+    callback_url = relationship(
+        "CallbackUrl",
+        foreign_keys=[callback_url_id]
+    )
+    storage = relationship(
+        "Storage",
+        foreign_keys=[storage_id]
+    )
+    def __str__(self):
+        return "ActiveConfig: {} - {} - {} - {}".format(self.settings, self.disk_management, self.callback_url, self.storage)
 
     def __repr__(self):
         return "{}".format(self.__str__())
