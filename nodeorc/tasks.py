@@ -364,7 +364,7 @@ def get_water_level(
 # ):
 #     # Create an event object
 #     if settings is None:
-#         raise IOError("For local processing, a settings file must be present in /settings/settings.json. Please create or modify your settings accordingly")
+#         raise IOError("For local processing, a settings file must be present in /settings/config.json. Please create or modify your settings accordingly")
 #     logger.info(f"Start listening to new videos in folder {incoming_video_path}")
 #     nodeorc_event = threading.Event()
 #     logger.info(f"I am monitoring {incoming_video_path}")

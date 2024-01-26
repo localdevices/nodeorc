@@ -14,9 +14,8 @@ class DiskManagement(BaseModel):
     frequency: int = 86400  # frequency to check the values in seconds
 
 
-class LocalConfig(BaseModel):
-    storage: Storage
-    callback_url: Optional[CallbackUrl]
+
+class Settings(BaseModel):
     incoming_path: DirectoryPath
     failed_path: DirectoryPath
     success_path: DirectoryPath
@@ -27,7 +26,6 @@ class LocalConfig(BaseModel):
     water_level_datetimefmt: str
     allowed_dt: float
     shutdown_after_task: StrictBool = False
-    disk_management: DiskManagement = DiskManagement()
 
     @field_validator("video_file_fmt")
     @classmethod
@@ -36,12 +34,22 @@ class LocalConfig(BaseModel):
         check_datetime_fmt(v)
         return v
 
-
     @field_validator("water_level_fmt")
     @classmethod
     def check_water_level_fmt(cls, v):
         check_datetime_fmt(v)
         return v
+
+
+class RemoteConfig(BaseModel):
+    amqp_connection: AnyHttpUrl
+
+
+class LocalConfig(BaseModel):
+    settings: Settings
+    storage: Storage
+    callback_url: Optional[CallbackUrl]
+    disk_management: DiskManagement = DiskManagement()
 
     def to_file(self, fn, indent=4, **kwargs):
         with open(fn, "w") as f:
@@ -62,9 +70,4 @@ class LocalConfig(BaseModel):
         """
         return self.model_dump_json(indent=indent)
         # load back and then store with indents
-        return task_json
-
-
-class RemoteConfig(BaseModel):
-    amqp_connection: AnyHttpUrl
 

@@ -1,4 +1,4 @@
-from db.models import ActiveConfig
+from nodeorc.db.models import ActiveConfig
 def active_config_available(session):
     """
     Returns if an active configuration already exists (True) or not (False)

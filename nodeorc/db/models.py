@@ -11,12 +11,6 @@ class Settings(Base):
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    storage = Column(
-        JSON, nullable=False,
-        default={"url": "./tmp", "bucket_name": "examplevideo"},
-        doc="storage details",
-        comment='JSON describing the storage as {"url": "<url>", "storage_bucket": "/path/to/bucket"}'
-    )
     incoming_path = Column(
         String,
         nullable=False,
@@ -68,17 +62,6 @@ class Settings(Base):
         default=False,
         nullable=False,
         comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling scheme is implemented and is meant to save power only."
-    )
-    disk_management = Column(
-        JSON,
-        nullable=False,
-        default={
-            "home_folder": "/home",
-            "min_free_space": 20,
-            "critical_space": 10,
-            "frequency": 3600
-        },
-        comment='JSON providing information on how to cleanup the disks if space is getting critical containing {"home_folder": "/path/to/folder/to/check/for/available/space", "min_free_space": <amount-of-GB>, "critical_space": <amount-of-GB>, "frequency": <frequency-in-seconds>}'
     )
 
     def __str__(self):
@@ -161,6 +144,9 @@ class CallbackUrl(Base):
 
 class Storage(Base):
     __tablename__ = "storage"
+
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     url = Column(
         String,
         default="./tmp",
@@ -181,10 +167,10 @@ class Storage(Base):
 class ActiveConfig(Base):
     __tablename__ = "active_config"
     id = Column(Integer, primary_key=True)
-    settings_id = Column(Integer, ForeignKey("settings.id"), nullable=False)
-    callback_url_id = Column(Integer, ForeignKey("callback_url.id"), nullable=False)
-    disk_management_id = Column(Integer, ForeignKey("disk_management.id"), nullable=False)
-    storage_id = Column(Integer, ForeignKey("storage.id"), nullable=False)
+    settings_id = Column(Integer, ForeignKey("settings.id"), nullable=False, comment="general settings of local paths, formats and device behaviour.")
+    callback_url_id = Column(Integer, ForeignKey("callback_url.id"), nullable=False, comment="url, and login tokens for reporting to web service.")
+    disk_management_id = Column(Integer, ForeignKey("disk_management.id"), nullable=False, comment="settings for managing disk space in case low disk space occurs.")
+    storage_id = Column(Integer, ForeignKey("storage.id"), nullable=False, comment="local or remote storage settings.")
     settings = relationship(
         "Settings",
         foreign_keys=[settings_id]

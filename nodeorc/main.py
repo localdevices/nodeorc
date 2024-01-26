@@ -22,26 +22,26 @@ temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 def get_docs_settings():
-    fixed_fields = ["id", "created_at", "metadata", "registry"]
+    fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
-    fields = [f for f in dir(db.models.Config) if not(f in fixed_fields) if not f.startswith("_")]
+    fields = [f for f in dir(db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
     docs = """JSON-file should contain the following settings: \n"""
     docs += """================================================\n\n"""
     for f in fields:
-        attr_doc = getattr(db.models.Config, f).comment
+        attr_doc = getattr(db.models.ActiveConfig, f).comment
         docs += " {} : {}\n\n".format(f, attr_doc)
     return docs
 
-def load_settings(settings_fn):
+def load_config(config_fn):
     # define local settings below
-    if os.path.isfile(settings_fn):
+    if os.path.isfile(config_fn):
         try:
-            with open(settings_fn, "r") as f:
+            with open(config_fn, "r") as f:
                 settings = models.LocalConfig(**json.load(f))
             return settings
         except ValidationError as e:
             raise ValueError(
-                f"Settings file in {os.path.abspath(settings_fn)} is not a valid local configuration file. Error: {e}")
+                f"Settings file in {os.path.abspath(config_fn)} is not a valid local configuration file. Error: {e}")
 
 def validate_env(env_var):
     if os.getenv(env_var) is None:
@@ -102,10 +102,10 @@ listen_opt = click.option(
     callback=validate_listen
 )
 settings_opt = click.option(
-    "--settings",
+    "--config",
     type=click.Path(exists=True),
     help="location of the settings .json file",
-    default=os.path.join(settings_path, "settings.json")
+    default=os.path.join(settings_path, "config.json")
 )
 task_form_opt = click.option(
     "--task_form",
@@ -171,7 +171,7 @@ def start(storage, listen, settings, task_form):
     if listen == "local":
         settings = load_settings(settings)
         if settings is None:
-            raise IOError("For local processing, a settings file must be present in /settings/settings.json. Please create or modify your settings accordingly")
+            raise IOError("For local processing, a settings file must be present in /settings/config.json. Please create or modify your settings accordingly")
         # validate the settings into a task model
         with open(task_form, "r") as f:
             task_form = json.load(f)
@@ -206,9 +206,9 @@ def start(storage, listen, settings, task_form):
 )
 def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
-    config = load_settings(json_file)
+    config = load_config(json_file)
     rec = db.config.add_config(session, config=config, set_as_active=set_as_active)
-    logger.info(f"Record {rec} added")
+    logger.info(f"Settings updated successfully to {rec} added")
 
 upload_config.__doc__ = get_docs_settings()
 # def main():
