@@ -1,3 +1,4 @@
+import models
 from nodeorc.models import LocalConfig, RemoteConfig
 from typing import Union
 import json
@@ -96,7 +97,7 @@ def add_replace_active_config(
     session.commit()
     return active_config_record
 
-def get_config(session, id):
+def get_settings(session, id):
     """
     Get a Config pydantic object from a stored db model
 
@@ -109,10 +110,20 @@ def get_config(session, id):
     -------
 
     """
-    return session.query(db_models.Config).get(id)
+    return session.query(db_models.Settings).get(id)
 
-def get_active_config(session):
+def get_active_config(session, parse=False):
     active_configs = session.query(db_models.ActiveConfig)
     assert(len(active_configs.all()) == 1),\
         'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc new_settings --help" for more information'
+    active_config = active_configs.first()
+    if parse:
+        # parse into a Config object (TODO, also add RemoteConfig options)
+        config_dict = {}
+        for attr in ["settings", "storage", "callback_url", "disk_management"]:
+            c = getattr(active_config, attr).__dict__
+            c.pop("_sa_instance_state")
+            c.pop("id")
+            config_dict[attr] = c
+        return models.LocalConfig(**config_dict)
     return active_configs.first()

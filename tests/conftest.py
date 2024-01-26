@@ -156,6 +156,27 @@ def s3storage():
     )
     return obj
 
+
+@pytest.fixture
+def settings(
+        incoming_path,
+        failed_path,
+        success_path,
+        results_path
+):
+    return models.Settings(
+        incoming_path=incoming_path,
+        failed_path=failed_path,
+        success_path=success_path,
+        results_path=results_path,
+        parse_dates_from_file=True,
+        video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
+        water_level_fmt="water_level/wl_{%Y%m%d}.csv",
+        water_level_datetimefmt="%Y%m%dT%H%M%S",
+        allowed_dt=1800
+    )
+
+
 @pytest.fixture
 def storage():
     obj = models.Storage(
@@ -322,25 +343,14 @@ def task_local(
 
 @pytest.fixture
 def config(
+    settings,
     callback_url,
     storage,
-    incoming_path,
-    success_path,
-    failed_path,
-    results_path
 ):
     return models.LocalConfig(
+        settings=settings,
         callback_url=callback_url,
         storage=storage,
-        incoming_path=incoming_path,
-        failed_path=failed_path,
-        success_path=success_path,
-        results_path=results_path,
-        parse_dates_from_file=True,
-        video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
-        water_level_fmt="water_level/wl_{%Y%m%d}.csv",
-        water_level_datetimefmt="%Y%m%dT%H%M%S",
-        allowed_dt=1800
     )
 
 
