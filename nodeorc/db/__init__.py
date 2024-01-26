@@ -3,7 +3,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base
+from .models import Base, Device
 from . import config
 from . import active_config
 from nodeorc import __home__
@@ -21,3 +21,9 @@ Session = sessionmaker()
 Session.configure(bind=engine)
 session = Session()
 
+# if no device id is present, then create one
+device_query = session.query(Device)
+if len(device_query.all()) == 0:
+    device = Device()
+    session.add(device)
+    session.commit()

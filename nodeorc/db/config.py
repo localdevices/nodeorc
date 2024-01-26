@@ -40,7 +40,6 @@ def add_config(
     # config_record = db_models.Config(**config_dict)
     # session.add(config_record)
     session.commit()
-    print(callback_url_record)
     if set_as_active:
         active_config_record = add_replace_active_config(
             session,
@@ -115,7 +114,7 @@ def get_settings(session, id):
 def get_active_config(session, parse=False):
     active_configs = session.query(db_models.ActiveConfig)
     assert(len(active_configs.all()) == 1),\
-        'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc new_settings --help" for more information'
+        'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc upload-config --help" for more information'
     active_config = active_configs.first()
     if parse:
         # parse into a Config object (TODO, also add RemoteConfig options)

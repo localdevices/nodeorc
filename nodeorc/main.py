@@ -21,6 +21,8 @@ load_dotenv()
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
+device = session.query(db.models.Device).first()
+
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
@@ -101,12 +103,6 @@ listen_opt = click.option(
          'listening to a locally mounted folder for new videos, or "AMQP" for tasks sent from a remote platform)',
     callback=validate_listen
 )
-settings_opt = click.option(
-    "--config",
-    type=click.Path(exists=True),
-    help="location of the settings .json file",
-    default=os.path.join(settings_path, "config.json")
-)
 task_form_opt = click.option(
     "--task_form",
     type=click.Path(exists=True),
@@ -161,17 +157,16 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 @cli.command(short_help="Start main daemon")
 @storage_opt
 @listen_opt
-@settings_opt
 @task_form_opt
-def start(storage, listen, settings, task_form):
-    print(storage)
+def start(storage, listen, task_form):
+    # get the device id
+    logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
     if listen == "local":
-        settings = load_settings(settings)
-        if settings is None:
-            raise IOError("For local processing, a settings file must be present in /settings/config.json. Please create or modify your settings accordingly")
+        # get the stored configuration
+        config = db.config.get_active_config(session, parse=True)
         # validate the settings into a task model
         with open(task_form, "r") as f:
             task_form = json.load(f)
@@ -181,7 +176,7 @@ def start(storage, listen, settings, task_form):
         except Exception as e:
             logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
         try:
-            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
+            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **config.model_dump())
             processor.await_task()
         except Exception as e:
             logger.error("Reboot service: %s" % str(e))
@@ -206,9 +201,10 @@ def start(storage, listen, settings, task_form):
 )
 def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
+    logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config = load_config(json_file)
     rec = db.config.add_config(session, config=config, set_as_active=set_as_active)
-    logger.info(f"Settings updated successfully to {rec} added")
+    logger.info(f"Settings updated successfully to {rec}")
 
 upload_config.__doc__ = get_docs_settings()
 # def main():

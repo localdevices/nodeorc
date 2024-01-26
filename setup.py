@@ -16,14 +16,15 @@ setup(
     test_suite="tests",
     python_requires=">=3.9",
     install_requires=[
-        "requests",
-        "pika",
         "boto3",
-        "ibm-cos-sdk",
-        "pyopenrivercam",
-        "pydantic==2.3.0",
-        "python-dotenv",
         "dask[distributed]"
+        "ibm-cos-sdk",
+        "pika",
+        "pydantic==2.3.0",
+        "pyopenrivercam",
+        "python-dotenv",
+        "requests",
+        "sqlalchemy"
     ],
     extras_require={
         "dev": ["pytest", "pytest-cov", "pytest-lazy-fixtures"],

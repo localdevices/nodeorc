@@ -23,35 +23,37 @@ class LocalTaskProcessor:
             task_form,
             callback_url: models.CallbackUrl,
             storage: models.Storage,
+            settings: models.Settings,
             temp_path: str,
-            incoming_path: str,
-            failed_path: str,
-            success_path: str,
-            results_path: str,
-            parse_dates_from_file: bool,
-            video_file_fmt: str,
-            water_level_fmt: str,
-            water_level_datetimefmt: str,
-            allowed_dt: float,
-            shutdown_after_task: bool,
+            # incoming_path: str,
+            # failed_path: str,
+            # success_path: str,
+            # results_path: str,
+            # parse_dates_from_file: bool,
+            # video_file_fmt: str,
+            # water_level_fmt: str,
+            # water_level_datetimefmt: str,
+            # allowed_dt: float,
+            # shutdown_after_task: bool,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
 
     ):
         self.task_form = task_form
+        self.settings = settings
         self.temp_path = temp_path
-        self.incoming_path = incoming_path
-        self.failed_path = failed_path
-        self.success_path = success_path
-        self.results_path = results_path
-        self.parse_dates_from_file = parse_dates_from_file
-        self.video_file_fmt = video_file_fmt
-        self.video_file_ext = video_file_fmt.split(".")[-1]
-        self.water_level_ftm = water_level_fmt
-        self.water_level_datetimefmt = water_level_datetimefmt
-        self.allowed_dt = allowed_dt
-        self.shutdown_after_task = shutdown_after_task
+        # self.incoming_path = incoming_path
+        # self.failed_path = failed_path
+        # self.success_path = success_path
+        # self.results_path = results_path
+        # self.parse_dates_from_file = parse_dates_from_file
+        # self.video_file_fmt = video_file_fmt
+        self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
+        # self.water_level_ftm = water_level_fmt
+        # self.water_level_datetimefmt = water_level_datetimefmt
+        # self.allowed_dt = allowed_dt
+        # self.shutdown_after_task = shutdown_after_task
         self.disk_management = disk_management
         self.callback_url = callback_url
         self.storage = storage
@@ -59,8 +61,8 @@ class LocalTaskProcessor:
         self.logger = logger
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-        self.logger.info(f'Water levels will be searched for in {water_level_fmt} using a datetime format "{self.water_level_datetimefmt}"')
-        self.logger.info(f"Start listening to new videos in folder {self.incoming_path}")
+        self.logger.info(f'Water levels will be searched for in {self.settings["water_level_fmt"]} using a datetime format "{self.settings["water_level_datetimefmt"]}')
+        self.logger.info(f"Start listening to new videos in folder {self.settings['incoming_path']}")
         self.event = threading.Event()
 
         # Create and start the thread
@@ -83,15 +85,19 @@ class LocalTaskProcessor:
 
     def await_task(self):
         # Get the number of available CPU cores
-        max_workers = np.minimum(self.max_workers, multiprocessing.cpu_count())
+        max_workers = np.minimum(
+            self.max_workers,
+            multiprocessing.cpu_count()
+        )
         # start the timer for the disk manager
         disk_mng_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                file_paths = disk_management.scan_folder(self.incoming_path, suffix=self.video_file_ext)
+                file_paths = disk_management.scan_folder(
+                    self.settings["incoming_path"],
+                    suffix=self.video_file_ext
+                )
                 for file_path in file_paths:
-                # for filename in os.listdir(self.incoming_path):
-                #     file_path = os.path.join(self.incoming_path, filename)
                     if os.path.isfile(file_path) and file_path not in self.processed_files:
                         print(f"Found file: {file_path}")
                         # Submit the file processing task to the thread pool
@@ -129,8 +135,8 @@ class LocalTaskProcessor:
         """
         ret = disk_management.purge(
             [
-                self.success_path,
-                self.failed_path,
+                self.settings["success_path"],
+                self.settings["failed_path"],
             ],
             free_space=free_space,
             min_free_space=self.disk_management["min_free_space"],
@@ -142,7 +148,7 @@ class LocalTaskProcessor:
             self.logger.warning(f"Space after purging still not enough, purging results folder")
             ret = disk_management.purge(
                 [
-                    self.results_path
+                    self.settings["results_path"]
                 ],
                 free_space=free_space,
                 min_free_space=self.disk_management["min_free_space"],
@@ -183,8 +189,8 @@ class LocalTaskProcessor:
             try:
                 timestamp = get_timestamp(
                     file_path,
-                    parse_from_fn=self.parse_dates_from_file,
-                    fn_fmt=self.video_file_fmt,
+                    parse_from_fn=self.settings["parse_dates_from_file"],
+                    fn_fmt=self.settings["video_file_fmt"],
                 )
             except Exception as e:
                 timestamp = None
@@ -192,7 +198,7 @@ class LocalTaskProcessor:
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
             storage = models.Storage(
-                url=str(self.results_path),
+                url=str(self.settings["results_path"]),
                 bucket_name=timestamp.strftime("%Y%m%d")
             )
             # move the file to the intended bucket
@@ -205,9 +211,9 @@ class LocalTaskProcessor:
             try:
                 h_a = get_water_level(
                     timestamp,
-                    file_fmt=self.water_level_ftm,
-                    datetime_fmt=self.water_level_datetimefmt,
-                    allowed_dt=self.allowed_dt
+                    file_fmt=self.settings["water_level_ftm"],
+                    datetime_fmt=self.settings["water_level_datetimefmt"],
+                    allowed_dt=self.settings["allowed_dt"]
                 )
             except Exception as e:
                 raise ValueError(
@@ -249,18 +255,18 @@ class LocalTaskProcessor:
             # process the task
             task.execute(self.temp_path)
             # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if self.success_path:
+            if self.settings["success_path"]:
                 dst_path = os.path.join(
-                    self.success_path,
+                    self.settings["success_path"],
                     timestamp.strftime("%Y%m%d")
                 )
         except Exception as e:
             self.logger.error(f"Error processing {file_path}: {str(e)}")
             # find back the file and place in the failed location, organised per day
             if timestamp:
-                dst_path = os.path.join(self.failed_path, timestamp.strftime("%Y%m%d"))
+                dst_path = os.path.join(self.settings["failed_path"], timestamp.strftime("%Y%m%d"))
             else:
-                dst_path = self.failed_path
+                dst_path = self.settings["failed_path"]
 
         if not os.path.isdir(dst_path):
             os.makedirs(dst_path)

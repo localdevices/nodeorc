@@ -1,10 +1,48 @@
+import datetime
+import os
+import platform
+import uuid
+
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, DateTime, JSON, Boolean, Float
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
-import datetime
-
 Base = declarative_base()
+
+
+class Device(Base):
+    __tablename__ = "device"
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=uuid.uuid4()
+    )
+    created_at = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        nullable=False
+    )
+    operating_system = Column(
+        String,
+        nullable=False,
+        default=platform.platform()
+    )
+    processor = Column(
+        String,
+        nullable=False,
+        default=platform.processor()
+    )
+    memory = Column(
+        Float,
+        nullable=False,
+        default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
+    )
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
 
 class Settings(Base):
     __tablename__ = 'settings'
