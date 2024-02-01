@@ -22,5 +22,5 @@ from .callback import Callback
 from .storage import Storage, S3Storage, File
 from .subtask import Subtask
 from .task import Task
-from .config import LocalConfig, RemoteConfig, DiskManagement
+from .config import LocalConfig, RemoteConfig, DiskManagement, Settings
 

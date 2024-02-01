@@ -3,11 +3,12 @@ import sys
 import logging
 import logging.handlers
 import os
-from nodeorc import __version__
+from nodeorc import __version__, __home__
 from datetime import datetime
 
 timestr = datetime.now().strftime("%Y%m%dT%H%M%S")
-
+datestr = datetime.now().strftime("%Y%m%d")
+from nodeorc import __home__
 FMT = "%(asctime)s - %(name)s - %(module)s - %(levelname)s - %(message)s"
 # logger = logging.getLogger(__name__)
 
@@ -77,12 +78,11 @@ def start_logger(verbose, quiet):
         quiet = 1
     else:
         quiet = 0
-    base_path = os.path.split(__file__)[0]
     logfile = os.path.abspath(
         os.path.join(
-            base_path,
-            "..",
+            __home__,
             "log",
+            datestr,
             f"nodeorc_{timestr}.log"
         )
     )

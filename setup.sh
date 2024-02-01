@@ -14,10 +14,10 @@ man_help(){
     echo '                         Install all dependencies'
     echo ''
     echo '        --nodeorc'
-    echo '                         Install pyorc environment including all python dependencies (Miniconda required)'
+    echo '                         Install nodeorc environment including all python dependencies'
     echo ''
     echo '        --service'
-    echo '                         Install pyorc operational service as systemd service with 15-minute timer'
+    echo '                         Install nodeorc operational service as systemd service with 15-minute timer'
     echo ''
     exit 0
 }
@@ -68,7 +68,7 @@ After=network.target
 # User=${USER}
 WorkingDirectory=${PWD}
 Environment="PATH=${HOME}/venv/nodeorc/bin"
-ExecStart=${HOME}/venv/nodeorc/bin/nodeorc --storage local --listen local
+ExecStart=${HOME}/venv/nodeorc/bin/nodeorc start --storage local --listen local
 Restart=always
 
 [Install]

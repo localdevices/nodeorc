@@ -5,27 +5,45 @@ import pika
 import sys
 import traceback
 
-from nodeorc import log, models, tasks, __version__
+from nodeorc import db, log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
-from nodeorc import settings_path
+from nodeorc import settings_path, db
+
+# globally required variables
+session = db.session
+logger = log.start_logger(True, False)
+
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
-def load_settings(settings_fn):
+device = session.query(db.models.Device).first()
+
+def get_docs_settings():
+    fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
+    # list all attributes except internal and fixed fields
+    fields = [f for f in dir(db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
+    docs = """JSON-file should contain the following settings: \n"""
+    docs += """================================================\n\n"""
+    for f in fields:
+        attr_doc = getattr(db.models.ActiveConfig, f).comment
+        docs += " {} : {}\n\n".format(f, attr_doc)
+    return docs
+
+def load_config(config_fn):
     # define local settings below
-    if os.path.isfile(settings_fn):
+    if os.path.isfile(config_fn):
         try:
-            with open(settings_fn, "r") as f:
+            with open(config_fn, "r") as f:
                 settings = models.LocalConfig(**json.load(f))
             return settings
         except ValidationError as e:
             raise ValueError(
-                f"Settings file in {os.path.abspath(settings_fn)} is not a valid local configuration file. Error: {e}")
+                f"Settings file in {os.path.abspath(config_fn)} is not a valid local configuration file. Error: {e}")
 
 def validate_env(env_var):
     if os.getenv(env_var) is None:
@@ -53,11 +71,19 @@ def validate_storage(ctx, param, value):
         pass
     return value
 
+
 def print_license(ctx, param, value):
     if not value:
         return {}
     click.echo(f"GNU Affero General Public License v3 (AGPLv3). See https://www.gnu.org/licenses/agpl-3.0.en.html")
     ctx.exit()
+
+def print_info(ctx, param, value):
+    if not value:
+        return {}
+    click.echo(f"NodeOpenRiverCam, Copyright Localdevices, Rainbow Sensing")
+    ctx.exit()
+
 
 
 verbose_opt = click.option("--verbose", "-v", count=True, help="Increase verbosity.")
@@ -76,12 +102,6 @@ listen_opt = click.option(
     help='Method for listening for new tasks (either "local" or "AMQP" Storage solution to use (either "local" for '
          'listening to a locally mounted folder for new videos, or "AMQP" for tasks sent from a remote platform)',
     callback=validate_listen
-)
-settings_opt = click.option(
-    "--settings",
-    type=click.Path(exists=True),
-    help="location of the settings .json file",
-    default=os.path.join(settings_path, "settings.json")
 )
 task_form_opt = click.option(
     "--task_form",
@@ -104,23 +124,49 @@ task_form_opt = click.option(
 #     task.execute(temp_path)
 #     ch.basic_ack(delivery_tag=method.delivery_tag)
 #
-# @click.group()
-@click.command()
+# @click.command()
+@click.group()
 @click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
+@click.option(
+    "--license",
+    default=False,
+    is_flag=True,
+    is_eager=True,
+    help="Print license information for NodeOpenRiverCam",
+    callback=print_license,
+)
+@click.option(
+    "--info",
+    default=False,
+    is_flag=True,
+    is_eager=True,
+    help="Print information and version of NodeOpenRiverCam",
+    callback=print_info,
+)
+@click.option(
+    '--debug/--no-debug',
+    default=False,
+    envvar='REPO_DEBUG'
+)
+@click.pass_context
+def cli(ctx, info, license, debug):  # , quiet, verbose):
+    """Command line interface for pyOpenRiverCam."""
+    if ctx.obj is None:
+        ctx.obj = {}
+
+@cli.command(short_help="Start main daemon")
 @storage_opt
 @listen_opt
-@settings_opt
 @task_form_opt
-def cli(storage, listen, settings, task_form):
-    print(storage)
-    logger = log.start_logger(True, False)
+def start(storage, listen, task_form):
+    # get the device id
+    logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
     if listen == "local":
-        settings = load_settings(settings)
-        if settings is None:
-            raise IOError("For local processing, a settings file must be present in /settings/settings.json. Please create or modify your settings accordingly")
+        # get the stored configuration
+        config = db.config.get_active_config(session, parse=True)
         # validate the settings into a task model
         with open(task_form, "r") as f:
             task_form = json.load(f)
@@ -130,14 +176,37 @@ def cli(storage, listen, settings, task_form):
         except Exception as e:
             logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
         try:
-            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **settings.model_dump())
+            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **config.model_dump())
             processor.await_task()
         except Exception as e:
             logger.error("Reboot service: %s" % str(e))
     else:
         raise NotImplementedError
 
+@cli.command(
+    short_help="Upload a new configuration for this device from a JSON formatted file",
+    epilog=get_docs_settings()
+)
+@click.argument(
+    "JSON-file",
+    type=click.Path(resolve_path=True, dir_okay=False, file_okay=True),
+    required=True,
+)
+@click.option(
+    "-a",
+    "--set-as-active",
+    is_flag=True,
+    default=True,
+    help="Flag to define if uploaded configuration should be set as active (default: True)"
+)
+def upload_config(json_file, set_as_active):
+    """Upload a new configuration for this device from a JSON formatted file"""
+    logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
+    config = load_config(json_file)
+    rec = db.config.add_config(session, config=config, set_as_active=set_as_active)
+    logger.info(f"Settings updated successfully to {rec}")
 
+upload_config.__doc__ = get_docs_settings()
 # def main():
 #     connection = pika.BlockingConnection(
 #         pika.URLParameters(
