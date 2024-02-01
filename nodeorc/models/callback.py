@@ -1,14 +1,19 @@
-import json
-from typing import Optional, Dict, Any
+from datetime import datetime
+from typing import Optional, Dict, Any, List, Union
 from pydantic import field_validator, BaseModel
 
 # nodeodm specific imports
 from nodeorc import callbacks
+from nodeorc.models import File, Storage
 
 class Callback(BaseModel):
-    func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
+    timestamp: datetime = datetime.now()
+    func_name: str = "discharge"  # name of function that establishes the callback json
+    storage: Storage = Storage()  # storage where the file(s) must be located
+    file: Optional[Union[File, str]] = None  # filename specific to the used callback, if callback does not require any input file, then leave empty
+    files_to_send: Optional[Union[List[str], Dict[str, File]]] = None
     request_type: str = "POST"
-    kwargs: Optional[Dict[str, Any]] = {}
+    kwargs: Optional[Dict[str, Any]] = {}  # set of kwargs to add to the callback msg body
     endpoint: Optional[str] = "/api/timeseries/"  # used to extend the default callback url
 
     @field_validator("func_name")
@@ -19,8 +24,9 @@ class Callback(BaseModel):
         return v
 
 
-    def get_body(self, task, subtask, tmp="."):
+    def get_body(self): #self, task, subtask, tmp="."):
         # get the name of callback
         func = getattr(callbacks, self.func_name)
-        data, files = func(task, subtask, tmp=tmp, **self.kwargs)
+        data, files = func(self)
+        # data, files = func(task, subtask, tmp=tmp, **self.kwargs)
         return data, files

@@ -12,9 +12,13 @@ import logging as logger
 
 # if no files are returned, then simply make files=None
 
-def discharge(task, subtask, tmp=".", **kwargs):
+def discharge(callback):
     # open the last file, which contains the transect
-    fn = os.path.join(tmp, subtask.output_files["transect"].tmp_name)
+    fn = os.path.join(
+        callback.storage.url,
+        callback.storage.bucket_name,
+        callback.file.remote_name
+    )
     ds = xr.open_dataset(fn)
     h = float(ds.h_a)
     Q = np.abs(ds.river_flow.values)
@@ -26,7 +30,7 @@ def discharge(task, subtask, tmp=".", **kwargs):
         perc_measured = np.nan * Q
     # make a json message
     msg = {
-        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": callback.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "h": h if np.isfinite(h) else None,
         "q_05": Q[0] if np.isfinite(Q[0]) else None,
         "q_25": Q[1] if np.isfinite(Q[1]) else None,
@@ -36,11 +40,11 @@ def discharge(task, subtask, tmp=".", **kwargs):
         "fraction_velocimetry": perc_measured[2] if np.isfinite(perc_measured[2]) else None  # only pass the 50th percentile
     }
     # add the static kwargs
-    msg = {**msg, **kwargs}
+    msg = {**msg, **callback.kwargs}
     files = None
     return msg, files
 
-def video(task, subtask, tmp=".", **kwargs):
+def video(callback):
     """
     Creates a video callback of an already processed video. Assumes that the processing status is DONE
 
@@ -55,52 +59,62 @@ def video(task, subtask, tmp=".", **kwargs):
     -------
 
     """
-    video_fn = os.path.join(tmp, subtask.input_files["videofile"].tmp_name)
-    video_name = subtask.input_files["videofile"].remote_name
-    img_fn = os.path.join(tmp, subtask.output_files["jpg"].tmp_name)
-    img_name = subtask.output_files["jpg"].remote_name
+    video_fn = os.path.join(
+        callback.storage.url,
+        callback.storage.bucket_name,
+        callback.files_to_send["videofile"].remote_name
+    )
+    video_name = callback.files_to_send["videofile"].remote_name
+    img_fn = os.path.join(
+        callback.storage.url,
+        callback.storage.bucket_name,
+        callback.files_to_send["jpg"].remote_name
+    )
+    img_name = callback.files_to_send["jpg"].remote_name
     files = {
         "file": (video_name, open(video_fn, "rb")),
         "image": (img_name, open(img_fn, "rb"))
     }
     msg = {
-        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": callback.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": 4,
     }
-    msg = {**msg, **kwargs}
-
+    msg = {**msg, **callback.kwargs}
     return msg, files
 
-def video_no_file(task, subtask, tmp=".", **kwargs):
-    img_fn = os.path.join(tmp, subtask.output_files["jpg"].tmp_name)
-    img_name = subtask.output_files["jpg"].remote_name
+def video_no_file(callback):
+    img_fn = os.path.join(
+        callback.storage.url,
+        callback.storage.bucket_name,
+        callback.files_to_send["jpg"].remote_name
+    )
+    img_name = callback.files_to_send["jpg"].remote_name
     files = {
         "image": (img_name, open(img_fn, "rb"))
     }
     msg = {
-        "timestamp": task.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": callback.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": 4,
     }
-    msg = {**msg, **kwargs}
+    msg = {**msg, **callback.kwargs}
     return msg, files
 
 
-
-def file_not_found(base_url, endpoint, task, fn, logger=logger):
-    msg = f"File {fn} not found after task {task}"
-    logger.error(msg)
-    url = f"{base_url}/{endpoint}"
-    requests.post(
-        url,
-        json={"error": msg}
-    )
-
-
-def error_from_task(base_url, endpoint, task, error, logger=logger):
-    msg = f"Task {task} returned error {str(repr(error))}"
-    logger.error(msg)
-    url = f"{base_url}/{endpoint}"
-    requests.post(
-        url,
-        json={"error": msg}
-    )
+# def file_not_found(base_url, endpoint, task, fn, logger=logger):
+#     msg = f"File {fn} not found after task {task}"
+#     logger.error(msg)
+#     url = f"{base_url}/{endpoint}"
+#     requests.post(
+#         url,
+#         json={"error": msg}
+#     )
+#
+#
+# def error_from_task(base_url, endpoint, task, error, logger=logger):
+#     msg = f"Task {task} returned error {str(repr(error))}"
+#     logger.error(msg)
+#     url = f"{base_url}/{endpoint}"
+#     requests.post(
+#         url,
+#         json={"error": msg}
+#     )

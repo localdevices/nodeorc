@@ -5,7 +5,6 @@ from typing import Optional, Dict, List
 from pydantic import field_validator, BaseModel
 from pyorc import service
 from io import BytesIO
-from urllib.parse import urljoin
 
 # nodeodm specific imports
 from nodeorc import callbacks
@@ -49,8 +48,8 @@ class Subtask(BaseModel):
         self.execute_subtask(logger=logger)
         if task.storage is not None:
             self.upload_outputs(task.storage, tmp)
-        if self.callbacks and task.callback_url:
-            self.execute_callbacks(task, tmp=tmp) # task.callback_url, timestamp=task.timestamp, tmp=tmp)
+        # if self.callbacks and task.callback_url:
+        #     self.execute_callbacks(task, tmp=tmp) # task.callback_url, timestamp=task.timestamp, tmp=tmp)
 
     def replace_files(self, input_files, output_files):
         """
@@ -123,45 +122,3 @@ class Subtask(BaseModel):
                     obj = BytesIO(f.read())
                 obj.seek(0)
                 storage.upload_io(obj, dest=v.remote_name)
-
-
-    def execute_callbacks(self, task, tmp): # callback_url, timestamp, tmp):
-        # get the name of callback
-        for callback in self.callbacks:
-            url = urljoin(str(task.callback_url.url), callback.endpoint)
-            task.logger.info(f"Sending {callback.func_name} callback to {url}")
-            data, files = callback.get_body(
-                task=task,
-                subtask=self,
-                tmp=tmp
-            )
-
-            # func = getattr(callbacks, self.callback.func_name)
-            # msg = func(self.output_files, timestamp=task.timestamp, tmp=tmp)
-
-            # get the type of request. Typically this is POST for an entirely new time series record created from an edge
-            # device, and PATCH for an existing record that must be provided with analyzed flows
-            task.callback_url.send_request(callback, data, files)
-
-            # request = getattr(
-            #     requests,
-            #     callback.request_type.lower()
-            # )
-            # # call the callback function with the output files as input, this is a standardized approach
-            # # prepare headers with the token
-            # if task.callback_url.token_access:
-            #     headers = {"Authorization": f"Bearer {task.callback_url.token_access}"}
-            # else:
-            #     headers = {}
-            #
-            # url = urljoin(str(task.callback_url.url), callback.endpoint)
-            # # perform callback (arrange the adding of token)
-            # r = request(
-            #     url,
-            #     json=json,
-            #     headers=headers,
-            #     files=files
-            # )
-            # if r.status_code != 200:
-            #     raise ValueError(f"callback to {url} failed with error code {r.status_code} and body {r.json()}")
-

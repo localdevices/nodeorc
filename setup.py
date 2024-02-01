@@ -17,7 +17,7 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "boto3",
-        "dask[distributed]"
+        "dask[distributed]",
         "ibm-cos-sdk",
         "pika",
         "pydantic==2.3.0",
