@@ -1,5 +1,4 @@
-import models
-from nodeorc.models import LocalConfig, RemoteConfig
+from nodeorc import models
 from typing import Union
 import json
 import nodeorc.db.models as db_models
@@ -7,7 +6,7 @@ import sqlalchemy
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
-        config: [LocalConfig, RemoteConfig],
+        config: [models.LocalConfig, models.RemoteConfig],
         set_as_active=True
 ):
     """
