@@ -9,7 +9,7 @@ from nodeorc import callbacks
 from urllib.parse import urljoin
 
 from nodeorc import settings_path
-
+from nodeorc.db import config, session
 
 class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
@@ -49,28 +49,28 @@ class CallbackUrl(BaseModel):
     #         raise ValueError(f"Timeout of 5 seconds reached on connection {v} reached")
     #     return v
 
-    @model_validator(mode="after")
-    def check_replace_token(self) -> 'CallbackUrl':
-        """
-        Upon creating an instance, immediately replace the access tokens by fresh ones, to ensure no security risks
-        are occurring. This is only necessary when there is an access token. If not it is assumed the server is local
-        and no authentication is required.
-
-        Returns
-        -------
-
-        """
-        if self.has_token:
-            # if the token is stored in a file, then it is assumed that this file contains the most actual CallbackUrl
-            # for this server, and the entire instance will be replaced
-            if os.path.isfile(self.token_file):
-                # read contents into a new instance and return that instead of self
-                with open(self.token_file, "r") as f:
-                    cb_dict = json.loads(f.read())
-                self.token_expiration = datetime.strptime(cb_dict["token_expiration"], "%Y-%m-%dT%H:%M:%S.%f")
-                self.token_access = cb_dict["token_access"]
-                self.token_refresh = cb_dict["token_refresh"]
-        return self
+    # @model_validator(mode="after")
+    # def check_replace_token(self) -> 'CallbackUrl':
+    #     """
+    #     Upon creating an instance, immediately replace the access tokens by fresh ones, to ensure no security risks
+    #     are occurring. This is only necessary when there is an access token. If not it is assumed the server is local
+    #     and no authentication is required.
+    #
+    #     Returns
+    #     -------
+    #
+    #     """
+    #     if self.has_token:
+    #         # if the token is stored in a file, then it is assumed that this file contains the most actual CallbackUrl
+    #         # for this server, and the entire instance will be replaced
+    #         if os.path.isfile(self.token_file):
+    #             # read contents into a new instance and return that instead of self
+    #             with open(self.token_file, "r") as f:
+    #                 cb_dict = json.loads(f.read())
+    #             self.token_expiration = datetime.strptime(cb_dict["token_expiration"], "%Y-%m-%dT%H:%M:%S.%f")
+    #             self.token_access = cb_dict["token_access"]
+    #             self.token_refresh = cb_dict["token_refresh"]
+    #     return self
 
     @property
     def token_file(self):
@@ -101,7 +101,6 @@ class CallbackUrl(BaseModel):
         with open(fn, "w") as f:
             f.write(self.to_json(**kwargs))
 
-
     def refresh_tokens(self):
         url = urljoin(str(self.url), self.token_refresh_end_point)
         body = {"refresh": self.token_refresh}
@@ -122,7 +121,13 @@ class CallbackUrl(BaseModel):
         -------
 
         """
-        self.to_file(fn=self.token_file, indent=4)
+        # get the active configuration record
+        active_config = config.get_active_config(session)
+        callback_url = active_config.callback_url
+        # update the tokens
+        callback_url.token_access = self.token_access
+        callback_url.token_refresh = self.token_refresh
+        callback_url.token_expiration = self.token_expiration
 
     def send_request(self, callback, data, files):
         if self.has_token:

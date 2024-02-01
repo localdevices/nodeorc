@@ -124,4 +124,4 @@ def get_active_config(session, parse=False):
             c.pop("id")
             config_dict[attr] = c
         return models.LocalConfig(**config_dict)
-    return active_configs.first()
+    return active_config
