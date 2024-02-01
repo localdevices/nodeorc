@@ -115,7 +115,7 @@ class CallbackUrl(BaseModel):
 
     def store_tokens(self):
         """
-        Store the tokens in the default file path with server_name in it.
+        Store the tokens in the active database config record
 
         Returns
         -------
@@ -150,9 +150,10 @@ class CallbackUrl(BaseModel):
             headers=headers,
             files=files
         )
-        if r.status_code != 200 and r.status_code != 201:
-            try:
-                raise ValueError(f'callback to {url} failed with error code {r.status_code} and body "{r.json()}"')
-            except:
-                raise ValueError(f'callback to {url} failed with error code {r.status_code}, and text body "{r.text}"')
+        return r
+        # if r.status_code != 200 and r.status_code != 201:
+        #     try:
+        #         raise ValueError(f'callback to {url} failed with error code {r.status_code} and body "{r.json()}"')
+        #     except:
+        #         raise ValueError(f'callback to {url} failed with error code {r.status_code}, and text body "{r.text}"')
 

@@ -12,6 +12,7 @@ import time
 import datetime
 import uuid
 from urllib.parse import urljoin
+from requests.exceptions import ConnectionError
 
 from . import models, disk_management
 
@@ -322,7 +323,11 @@ class LocalTaskProcessor:
 
             # get the type of request. Typically this is POST for an entirely new time series record created from an edge
             # device, and PATCH for an existing record that must be provided with analyzed flows
-            self.callback_url.send_request(callback, data, files)
+            try:
+                self.callback_url.send_request(callback, data, files)
+            except ConnectionError as e:
+                # store callback in database instead
+                pass
 
 
 

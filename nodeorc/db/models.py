@@ -1,5 +1,5 @@
 import datetime
-import os
+import psutil
 import platform
 import uuid
 
@@ -34,7 +34,8 @@ class Device(Base):
     memory = Column(
         Float,
         nullable=False,
-        default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
+        default=psutil.virtual_memory().total / (1024**3)
+        # default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
     )
 
     def __str__(self):
