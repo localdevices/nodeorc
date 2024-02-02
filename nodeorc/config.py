@@ -1,12 +1,11 @@
-from nodeorc import models
-from typing import Union
+from models import LocalConfig, RemoteConfig
 import json
 import nodeorc.db.models as db_models
 import sqlalchemy
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
-        config: [models.LocalConfig, models.RemoteConfig],
+        config: [LocalConfig, RemoteConfig],
         set_as_active=True
 ):
     """
@@ -123,5 +122,5 @@ def get_active_config(session, parse=False):
             c.pop("_sa_instance_state")
             c.pop("id")
             config_dict[attr] = c
-        return models.LocalConfig(**config_dict)
+        return LocalConfig(**config_dict)
     return active_config

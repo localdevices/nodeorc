@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
 from pydantic import field_validator, BaseModel
 
+import nodeorc.db.models
 # nodeodm specific imports
 from nodeorc import callbacks
 from nodeorc.models import File, Storage
@@ -24,9 +25,17 @@ class Callback(BaseModel):
         return v
 
 
-    def get_body(self): #self, task, subtask, tmp="."):
+    def get_body(self):
         # get the name of callback
         func = getattr(callbacks, self.func_name)
         data, files = func(self)
         # data, files = func(task, subtask, tmp=tmp, **self.kwargs)
         return data, files
+
+
+    def to_db(self):
+        rec = nodeorc.db.models.Callback(
+            body=self.model_dump_json()
+        )
+        nodeorc.db.session.add(rec)
+        nodeorc.db.session.commit()

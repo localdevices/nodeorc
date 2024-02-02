@@ -80,7 +80,7 @@ def crossection_url():
 
 @pytest.fixture
 def output_nc():
-    return os.path.join(__file__, "examples", "ngwerere_transect.nc")
+    return os.path.join(os.path.dirname(__file__), "examples", "ngwerere_transect.nc")
 
 @pytest.fixture
 def crossection(crossection_url):
@@ -212,9 +212,16 @@ def callback_url_amqp():
 @pytest.fixture
 def callback(output_nc):
     obj = models.Callback(
-        file=output_nc,
+        file=models.File(
+            tmp_name=os.path.split(output_nc)[1],
+            remote_name=os.path.split(output_nc)[1]
+        ),
         func_name="discharge",
         kwargs={},
+        storage=models.Storage(
+            url="",
+            bucket_name=os.path.split(output_nc)[0]
+        ),
         endpoint="/api/timeseries/"  # used to extend the default callback url
     )
     return obj

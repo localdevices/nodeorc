@@ -1,15 +1,15 @@
-import json
 import os
 import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from pydantic import field_validator, BaseModel, AnyHttpUrl, model_validator
+from pydantic import field_validator, BaseModel, AnyHttpUrl
 # nodeodm specific imports
 from nodeorc import callbacks
 from urllib.parse import urljoin
 
 from nodeorc import settings_path
-from nodeorc.db import config, session
+from nodeorc.db import session
+
 
 class Callback(BaseModel):
     func_name: Optional[str] = "discharge"  # name of function that establishes the callback json
@@ -122,12 +122,25 @@ class CallbackUrl(BaseModel):
 
         """
         # get the active configuration record
+        import config  # import lazily to avoid circular referencing
         active_config = config.get_active_config(session)
         callback_url = active_config.callback_url
         # update the tokens
         callback_url.token_access = self.token_access
         callback_url.token_refresh = self.token_refresh
         callback_url.token_expiration = self.token_expiration
+
+
+    def send_callback(self, callback):
+        data, files = callback.get_body()
+        # get the type of request. Typically this is POST for an entirely new time series record created from an edge
+        # device, and PATCH for an existing record that must be provided with analyzed flows
+        try:
+            r = self.send_request(callback, data, files)
+        except Exception as e:
+            # store callback in database instead
+            r = None
+        return r
 
     def send_request(self, callback, data, files):
         if self.has_token:

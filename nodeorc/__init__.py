@@ -13,3 +13,4 @@ from . import models
 from . import callbacks
 from . import disk_management
 from . import db
+from . import config

@@ -22,7 +22,7 @@ REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
 class LocalTaskProcessor:
     def __init__(
             self,
-            task_form,
+            task_form_template,
             callback_url: models.CallbackUrl,
             storage: models.Storage,
             settings: models.Settings,
@@ -42,7 +42,7 @@ class LocalTaskProcessor:
             logger=logging,
 
     ):
-        self.task_form = task_form
+        self.task_form_template = task_form_template
         self.settings = settings
         self.temp_path = temp_path
         # self.incoming_path = incoming_path
@@ -181,7 +181,10 @@ class LocalTaskProcessor:
             file_path,
     ):
         task_uuid = uuid.uuid4()
-        task_path = os.path.join(self.temp_path, str(task_uuid))
+        task_path = os.path.join(
+            self.temp_path,
+            str(task_uuid)
+        )
         # ensure the tmp path is in place
         if not(os.path.isdir(task_path)):
             os.makedirs(task_path)
@@ -223,54 +226,17 @@ class LocalTaskProcessor:
                 raise ValueError(
                     f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
                 )
-            task_form = copy.deepcopy(self.task_form)
-            # prepare input_files field in task definition
-            input_files = {
-                "videofile": models.File(
-                    remote_name=filename,
-                    tmp_name=filename
-                )
-            }
-            # output file templates are filled in with the timestamp
-            output_files = {
-                k: models.File(
-                    remote_name = v["remote_name"].format(timestamp.strftime('%Y%m%dT%H%M%S')),
-                    tmp_name = v["tmp_name"]
-                ) for k, v in task_form["output_files"].items()
-            }
-            # callback jsons are converted to Callback objects
-            callbacks = []
-            for cb in task_form["callbacks"]:
-                if "file" in cb:
-                    cb["file"] = output_files[cb["file"]]
-                if "files_to_send" in cb:
-                    cb["files_to_send"] = {fn: output_files[fn] for fn in cb["files_to_send"]}
-                cb_obj = models.Callback(
-                    storage=storage,
-                    timestamp=timestamp,
-                    **cb
-                )
-                callbacks.append(cb_obj)
-
-            # replace input and output files
-            for repl_arg in REPLACE_ARGS:
-                if repl_arg in task_form:
-                    del task_form[repl_arg]
-            task = models.Task(
-                id=task_uuid,
-                timestamp=timestamp,
-                storage=storage,
-                input_files=input_files,
-                output_files=output_files,
-                callbacks=callbacks,
-                logger=self.logger,
-                **task_form
+            # create the task object from all data
+            task = create_task(
+                self.task_form_template,
+                task_uuid,
+                task_path,
+                storage,
+                filename,
+                timestamp,
+                h_a,
+                logger=self.logger
             )
-
-            # replace water level
-            task.subtasks[0].kwargs["h_a"] = h_a
-            # replace output to a uuid-formed output path
-            task.subtasks[0].kwargs["output"] = os.path.join(task_path, "OUTPUT")
             # set cur_path to tmp location (only used on exception)
             cur_path = os.path.join(task_path, filename)
             # process the task
@@ -317,18 +283,22 @@ class LocalTaskProcessor:
         for callback in callbacks:
             url = urljoin(str(self.callback_url.url), callback.endpoint)
             self.logger.info(f"Sending {callback.func_name} callback to {url}")
-            data, files = callback.get_body()
-            # func = getattr(callbacks, self.callback.func_name)
-            # msg = func(self.output_files, timestamp=task.timestamp, tmp=tmp)
-
-            # get the type of request. Typically this is POST for an entirely new time series record created from an edge
-            # device, and PATCH for an existing record that must be provided with analyzed flows
-            try:
-                self.callback_url.send_request(callback, data, files)
-            except ConnectionError as e:
-                # store callback in database instead
-                pass
-
+            store_callback = False
+            r = self.callback_url.send_callback(callback)
+            if r is None:
+                self.logger.error(
+                    f"Connection to {url} failed, connection error"
+                )
+                store_callback = True
+            elif r.status_code != 201 and r.status_code != 200:
+                self.logger.error(
+                    f'callback to {url} failed with error code {r.status_code}, storing callback in database'
+                )
+                store_callback = True
+            if store_callback:
+                # something went wrong while sending, store callback for a later re-try
+                self.logger.info(f"Storing callback in database to prevent loss of data")
+                callback.to_db()
 
 
 def get_timestamp(
@@ -403,7 +373,64 @@ def get_water_level(
     h_a = df.iloc[i].values[0]
     return h_a
 
+def create_task(
+    task_form_template,
+    task_uuid,
+    task_path,
+    storage,
+    filename,
+    timestamp,
+    h_a,
+    logger=logging
+):
+    task_form = copy.deepcopy(task_form_template)
+    # prepare input_files field in task definition
+    input_files = {
+        "videofile": models.File(
+            remote_name=filename,
+            tmp_name=filename
+        )
+    }
+    # output file templates are filled in with the timestamp
+    output_files = {
+        k: models.File(
+            remote_name=v["remote_name"].format(timestamp.strftime('%Y%m%dT%H%M%S')),
+            tmp_name=v["tmp_name"]
+        ) for k, v in task_form["output_files"].items()
+    }
+    # callback jsons are converted to Callback objects
+    callbacks = []
+    for cb in task_form["callbacks"]:
+        if "file" in cb:
+            cb["file"] = output_files[cb["file"]]
+        if "files_to_send" in cb:
+            cb["files_to_send"] = {fn: output_files[fn] for fn in cb["files_to_send"]}
+        cb_obj = models.Callback(
+            storage=storage,
+            timestamp=timestamp,
+            **cb
+        )
+        callbacks.append(cb_obj)
 
+    # replace input and output files
+    for repl_arg in REPLACE_ARGS:
+        if repl_arg in task_form:
+            del task_form[repl_arg]
+    task = models.Task(
+        id=task_uuid,
+        timestamp=timestamp,
+        storage=storage,
+        input_files=input_files,
+        output_files=output_files,
+        callbacks=callbacks,
+        logger=logger,
+        **task_form
+    )
+    # replace a number of dynamic items, water level and output directory
+    task.subtasks[0].kwargs["h_a"] = h_a
+    # replace output to a uuid-formed output path
+    task.subtasks[0].kwargs["output"] = os.path.join(task_path, "OUTPUT")
+    return task
 # def local_tasks(
 #         task_template,
 #         temp_path,
@@ -447,28 +474,4 @@ def get_water_level(
 #     print("Program terminated.")
 #
 #
-# # Define the function that will run in the thread to monitor the folder
-# def folder_monitor(
-#         folder_path,
-#         temp_path,
-#         task_template,
-#         logger,
-#         processed_files,
-#         event,
-#         max_workers=1
-# ):
-#     # Get the number of available CPU cores
-#     max_workers = np.minimum(max_workers, multiprocessing.cpu_count())
-#     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-#         while not event.is_set():
-#             for filename in os.listdir(folder_path):
-#                 file_path = os.path.join(folder_path, filename)
-#                 if os.path.isfile(file_path) and file_path not in processed_files:
-#                     print(f"Found file: {file_path}")
-#                     # Submit the file processing task to the thread pool
-#                     executor.submit(process_file, file_path, temp_path, task_template, processed_files, logger)
-#                     processed_files.add(file_path)
-#                     # # Optionally, you can move or delete the processed file
-#                     # os.remove(file_path)
-#             time.sleep(1)  # Adjust the sleep interval as needed
 #
