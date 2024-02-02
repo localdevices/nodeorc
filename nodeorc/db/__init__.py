@@ -4,7 +4,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Device
-from . import config
 from . import active_config
 from nodeorc import __home__
 

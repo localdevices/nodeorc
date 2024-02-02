@@ -1,5 +1,6 @@
 import datetime
-import os
+import json
+import psutil
 import platform
 import uuid
 
@@ -7,6 +8,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Table, DateTime, JSO
 from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
+import nodeorc.models
 Base = declarative_base()
 
 
@@ -34,7 +36,8 @@ class Device(Base):
     memory = Column(
         Float,
         nullable=False,
-        default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
+        default=psutil.virtual_memory().total / (1024**3)
+        # default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
     )
 
     def __str__(self):
@@ -230,3 +233,21 @@ class ActiveConfig(Base):
 
     def __repr__(self):
         return "{}".format(self.__str__())
+
+class Callback(Base):
+    __tablename__ = "callback"
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    body = Column(JSON)
+
+    def __str__(self):
+        return "{}".format(self.body)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())
+
+    @property
+    def callback(self):
+        body = json.loads(self.body)
+        return nodeorc.models.Callback(**body)
+

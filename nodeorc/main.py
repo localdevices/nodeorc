@@ -1,19 +1,17 @@
 import click
 import json
 import os
-import pika
-import sys
-import traceback
 
-from nodeorc import db, log, models, tasks, __version__
+import nodeorc
+# from nodeorc import log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
-from nodeorc import settings_path, db
+# from nodeorc import settings_path, db, config
 
 # globally required variables
-session = db.session
-logger = log.start_logger(True, False)
+session = nodeorc.db.session
+logger = nodeorc.log.start_logger(True, False)
 
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
@@ -21,16 +19,16 @@ load_dotenv()
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
-device = session.query(db.models.Device).first()
+device = session.query(nodeorc.db.models.Device).first()
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
-    fields = [f for f in dir(db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
+    fields = [f for f in dir(nodeorc.db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
     docs = """JSON-file should contain the following settings: \n"""
     docs += """================================================\n\n"""
     for f in fields:
-        attr_doc = getattr(db.models.ActiveConfig, f).comment
+        attr_doc = getattr(nodeorc.db.models.ActiveConfig, f).comment
         docs += " {} : {}\n\n".format(f, attr_doc)
     return docs
 
@@ -39,7 +37,7 @@ def load_config(config_fn):
     if os.path.isfile(config_fn):
         try:
             with open(config_fn, "r") as f:
-                settings = models.LocalConfig(**json.load(f))
+                settings = nodeorc.models.LocalConfig(**json.load(f))
             return settings
         except ValidationError as e:
             raise ValueError(
@@ -107,7 +105,7 @@ task_form_opt = click.option(
     "--task_form",
     type=click.Path(exists=True),
     help="location of the task form .json file",
-    default=os.path.join(settings_path, "task_form.json")
+    default=os.path.join(nodeorc.settings_path, "task_form.json")
 )
 
 # Callback function for each process task that is queued.
@@ -126,7 +124,7 @@ task_form_opt = click.option(
 #
 # @click.command()
 @click.group()
-@click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
+@click.version_option(nodeorc.__version__, message="NodeOpenRiverCam version: %(version)s")
 @click.option(
     "--license",
     default=False,
@@ -166,17 +164,22 @@ def start(storage, listen, task_form):
         raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
     if listen == "local":
         # get the stored configuration
-        config = db.config.get_active_config(session, parse=True)
+        config = nodeorc.config.get_active_config(session, parse=True)
         # validate the settings into a task model
         with open(task_form, "r") as f:
-            task_form = json.load(f)
+            task_form_template = json.load(f)
         # verify that task_template can be converted to a valid Task
         try:
-            task_test = models.Task(**task_form)
+            task_test = nodeorc.models.Task(**task_form_template)
         except Exception as e:
             logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
         try:
-            processor = tasks.LocalTaskProcessor(task_form=task_form, temp_path=temp_path, logger=logger, **config.model_dump())
+            processor = nodeorc.tasks.LocalTaskProcessor(
+                task_form_template=task_form_template,
+                temp_path=temp_path,
+                logger=logger,
+                **config.model_dump()
+            )
             processor.await_task()
         except Exception as e:
             logger.error("Reboot service: %s" % str(e))
@@ -203,7 +206,7 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config = load_config(json_file)
-    rec = db.config.add_config(session, config=config, set_as_active=set_as_active)
+    rec = config.add_config(session, config=config, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 upload_config.__doc__ = get_docs_settings()
