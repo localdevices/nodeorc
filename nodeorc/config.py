@@ -1,4 +1,4 @@
-from models import LocalConfig, RemoteConfig
+from nodeorc.models import LocalConfig, RemoteConfig
 import json
 import nodeorc.db.models as db_models
 import sqlalchemy

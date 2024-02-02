@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from . import models, disk_management
+from . import models, disk_management, db
 
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
@@ -247,9 +247,11 @@ class LocalTaskProcessor:
                     self.settings["success_path"],
                     timestamp.strftime("%Y%m%d")
                 )
-            # perform the callbacks here
-            self.execute_callbacks(task.callbacks)
+            # perform the callbacks here only when video was successfully completed
+            callback_success = self.post_callbacks(task.callbacks)
+
         except Exception as e:
+            callback_success = False  # video was unsuccessful so callbacks are also not successful
             self.logger.error(f"Error processing {file_path}: {str(e)}")
             # find back the file and place in the failed location, organised per day
             if timestamp:
@@ -268,6 +270,8 @@ class LocalTaskProcessor:
             shutil.rmtree((task_path))
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
+        # if callbacks were successful, try to send off old callbacks that were not successful earlier
+        self.post_old_callbacks()
         # shutdown if configured to shutdown after task
         self.shutdown_or_not()
 
@@ -278,19 +282,34 @@ class LocalTaskProcessor:
             os.system("/sbin/shutdown -h now")
 
 
-    def execute_callbacks(self, callbacks): # callback_url, timestamp, tmp):
+    def post_callbacks(self, callbacks):
+        """
+        Performs callbacks in a list, and returns True when all were successful
+
+        Parameters
+        ----------
+        callbacks : list[Callback]
+
+        Returns
+        -------
+        True / False (all successful or not)
+        """
         # get the name of callback
+        success = True
         for callback in callbacks:
+
             url = urljoin(str(self.callback_url.url), callback.endpoint)
             self.logger.info(f"Sending {callback.func_name} callback to {url}")
             store_callback = False
             r = self.callback_url.send_callback(callback)
             if r is None:
+                success = False
                 self.logger.error(
                     f"Connection to {url} failed, connection error"
                 )
                 store_callback = True
             elif r.status_code != 201 and r.status_code != 200:
+                success = False
                 self.logger.error(
                     f'callback to {url} failed with error code {r.status_code}, storing callback in database'
                 )
@@ -299,6 +318,33 @@ class LocalTaskProcessor:
                 # something went wrong while sending, store callback for a later re-try
                 self.logger.info(f"Storing callback in database to prevent loss of data")
                 callback.to_db()
+
+        return success
+
+    def post_old_callbacks(self):
+        callback_records = db.session.query(db.models.Callback)
+        callbacks = [cb.callback for cb in callback_records]
+        # send off
+        success = True
+        for callback_record in callback_records:
+            callback = callback_record.callback
+            url = urljoin(str(self.callback_url.url), callback.endpoint)
+            self.logger.info(f"Sending {callback.func_name} callback to {url}")
+            r = self.callback_url.send_callback(callback)
+            if r is None:
+                success = False
+                self.logger.error(
+                    f"Connection to {url} failed, connection error, stopping posts"
+                )
+            elif r.status_code != 201 and r.status_code != 200:
+                self.logger.error(
+                    f'callback to {url} failed with error code {r.status_code}, skipping record'
+                )
+            if not(success):
+                # immediately stop the processing of callbacks
+                break
+            db.session.delete(callback_record)
+            db.session.commit()
 
 
 def get_timestamp(

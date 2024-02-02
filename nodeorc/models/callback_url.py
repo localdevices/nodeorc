@@ -129,7 +129,7 @@ class CallbackUrl(BaseModel):
         callback_url.token_access = self.token_access
         callback_url.token_refresh = self.token_refresh
         callback_url.token_expiration = self.token_expiration
-
+        session.commit()
 
     def send_callback(self, callback):
         data, files = callback.get_body()

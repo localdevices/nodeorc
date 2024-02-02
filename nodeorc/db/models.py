@@ -246,6 +246,7 @@ class Callback(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
+    @property
     def callback(self):
         body = json.loads(self.body)
         return nodeorc.models.Callback(**body)
