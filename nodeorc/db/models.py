@@ -1,14 +1,24 @@
 import datetime
+import enum
 import json
 import psutil
 import platform
 import uuid
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Table, DateTime, JSON, Boolean, Float
-from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
+from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
 import nodeorc.models
+
+class TaskFormStatus(enum.Enum):
+    NEW = 2  # task form that does not pass through validation
+    REJECTED = 2  # task form that does not pass through validation
+    ACCEPTED = 3  # currently active task form
+    CANDIDATE = 4  # New form, that passed validation, but not yet trialled on a full video
+    ANCIENT = 5  # surpassed and no longer available for replacement
+
+
 Base = declarative_base()
 
 
@@ -17,6 +27,11 @@ class Device(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4()
+    )
+    name = Column(
+        String,
+        nullable=False,
+        default=""
     )
     created_at = Column(
         DateTime,
@@ -251,3 +266,9 @@ class Callback(Base):
         body = json.loads(self.body)
         return nodeorc.models.Callback(**body)
 
+
+class TaskForm(Base):
+    __tablename__ = "task_form"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
+    body = Column(JSON)

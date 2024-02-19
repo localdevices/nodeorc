@@ -3,7 +3,6 @@ import json
 import os
 
 import nodeorc
-# from nodeorc import log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
@@ -165,6 +164,8 @@ def start(storage, listen, task_form):
     if listen == "local":
         # get the stored configuration
         config = nodeorc.config.get_active_config(session, parse=True)
+        # read the task form from the configuration
+
         # validate the settings into a task model
         with open(task_form, "r") as f:
             task_form_template = json.load(f)
@@ -206,7 +207,7 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config = load_config(json_file)
-    rec = config.add_config(session, config=config, set_as_active=set_as_active)
+    rec = nodeorc.config.add_config(session, config=config, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 upload_config.__doc__ = get_docs_settings()
