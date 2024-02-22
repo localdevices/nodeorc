@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from . import models, disk_management, db
+from nodeorc import models, disk_management, db
 
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
@@ -477,47 +477,3 @@ def create_task(
     # replace output to a uuid-formed output path
     task.subtasks[0].kwargs["output"] = os.path.join(task_path, "OUTPUT")
     return task
-# def local_tasks(
-#         task_template,
-#         temp_path,
-#         incoming_video_path=settings.incoming_path,
-#         logger=logging
-# ):
-#     # Create an event object
-#     if settings is None:
-#         raise IOError("For local processing, a settings file must be present in /settings/config.json. Please create or modify your settings accordingly")
-#     logger.info(f"Start listening to new videos in folder {incoming_video_path}")
-#     nodeorc_event = threading.Event()
-#     logger.info(f"I am monitoring {incoming_video_path}")
-#
-#     # make a list for processed files or files that are being processed so that they are not duplicated
-#     processed_files = set()
-#
-#     # Create and start the thread
-#     nodeorc_thread = threading.Thread(
-#         target=folder_monitor,
-#         args=(
-#             incoming_video_path,
-#             temp_path,
-#             task_template,
-#             logger,
-#             processed_files,
-#             nodeorc_event,
-#             2
-#         )
-#     )
-#     nodeorc_thread.start()
-#     try:
-#         # Your main program can continue running here
-#         while not nodeorc_event.is_set():
-#             time.sleep(1)
-#         print("Folder monitor event was triggered. Exiting the program.")
-#     except KeyboardInterrupt:
-#         # Handle Ctrl+C to stop the program
-#         nodeorc_event.set()
-#         nodeorc_thread.join()
-#     # Cleanup and exit
-#     print("Program terminated.")
-#
-#
-#

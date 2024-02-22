@@ -165,10 +165,15 @@ def start(storage, listen, task_form):
         # get the stored configuration
         config = nodeorc.config.get_active_config(session, parse=True)
         # read the task form from the configuration
-
+        task_form_template = nodeorc.config.get_active_task_form(session, parse=True)
+        if task_form_template is None:
+            # go into the task form get daemon and try to acquire a task form from server every 5 minutes
+            callback_url = config.callback_url
+            nodeorc.tasks.fetch_task_form(session, callback_url, device, logger=logger)
         # validate the settings into a task model
-        with open(task_form, "r") as f:
-            task_form_template = json.load(f)
+        # with open(task_form, "r") as f:
+        #     task_form_template = json.load(f)
+        task_form_template = json.loads(task_form_template)
         # verify that task_template can be converted to a valid Task
         try:
             task_test = nodeorc.models.Task(**task_form_template)

@@ -124,3 +124,30 @@ def get_active_config(session, parse=False):
             config_dict[attr] = c
         return LocalConfig(**config_dict)
     return active_config
+
+
+def get_active_task_form(session, parse=False, allow_candidate=True):
+    query = session.query(db_models.TaskForm)
+    if len(query.all()) == 0:
+        # there are no task forms yet, return None
+        return None
+
+    # assume a search in the accepted task forms is needed
+    get_accepted = True
+    if allow_candidate:
+        # first check for a candidate
+        query_candidate = query.filter_by(status=db_models.TaskFormStatus.CANDIDATE)
+        if len(query_candidate.all()) > 0:
+            # accepted task form not needed
+            get_accepted = False
+            query = query_candidate
+
+    if get_accepted:
+        # find the single task form that is active
+        query = query.filter_by(status=db_models.TaskFormStatus.ACCEPTED)
+        if len(query.all()) == 0:
+            return None
+    task_form = query.first()
+    if parse:
+        task_form = task_form.body
+    return task_form

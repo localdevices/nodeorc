@@ -17,6 +17,7 @@ class TaskFormStatus(enum.Enum):
     ACCEPTED = 3  # currently active task form
     CANDIDATE = 4  # New form, that passed validation, but not yet trialled on a full video
     ANCIENT = 5  # surpassed and no longer available for replacement
+    BROKEN = 6  # task form used to be valid but no longer, e.g. due to upgrade of version of nodeorc
 
 
 Base = declarative_base()
@@ -61,6 +62,15 @@ class Device(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
+    @property
+    def as_dict(self):
+        device_info = {
+            key: value for key, value in self.__dict__.items() if not key.startswith('_') and not callable(value)
+        }
+        # replace the datetime by a time string
+        device_info["created_at"] = self.created_at.strftime("%Y-%m-%dT%H:%M:%S")
+        device_info["id"] = str(self.id)
+        return device_info
 
 class Settings(Base):
     __tablename__ = 'settings'
@@ -269,6 +279,9 @@ class Callback(Base):
 
 class TaskForm(Base):
     __tablename__ = "task_form"
+    id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
-    body = Column(JSON)
+    task_body = Column(JSON)
+    message = Column(String)  # error message if any
+
