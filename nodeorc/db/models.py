@@ -3,6 +3,7 @@ import enum
 import json
 import psutil
 import platform
+import socket
 import uuid
 
 from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
@@ -11,13 +12,25 @@ from sqlalchemy.ext.declarative import declarative_base
 
 import nodeorc.models
 
+
 class TaskFormStatus(enum.Enum):
-    NEW = 2  # task form that does not pass through validation
+    NEW = 1  # task form that does not pass through validation
     REJECTED = 2  # task form that does not pass through validation
     ACCEPTED = 3  # currently active task form
     CANDIDATE = 4  # New form, that passed validation, but not yet trialled on a full video
     ANCIENT = 5  # surpassed and no longer available for replacement
     BROKEN = 6  # task form used to be valid but no longer, e.g. due to upgrade of version of nodeorc
+
+
+class DeviceStatus(enum.Enum):
+    HEALTHY = 0
+    LOW_VOLTAGE = 1
+
+
+class DeviceFormStatus(enum.Enum):
+    NOFORM = 0  # set at start of device.
+    INVALID_FORM = 1  # if only an invalid form is available
+    BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
 
 
 Base = declarative_base()
@@ -32,7 +45,7 @@ class Device(Base):
     name = Column(
         String,
         nullable=False,
-        default=""
+        default=socket.gethostname()
     )
     created_at = Column(
         DateTime,
@@ -55,6 +68,9 @@ class Device(Base):
         default=psutil.virtual_memory().total / (1024**3)
         # default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
     )
+    status = Column(Enum(DeviceStatus), default=DeviceStatus.HEALTHY)
+    form_status = Column(Enum(DeviceFormStatus), default=DeviceFormStatus.NOFORM)
+    message = Column(String, nullable=True)  # error message if any
 
     def __str__(self):
         return "{}".format(self.id)
@@ -279,9 +295,11 @@ class Callback(Base):
 
 class TaskForm(Base):
     __tablename__ = "task_form"
-    id = Column(Integer, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True
+    )
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
     task_body = Column(JSON)
-    message = Column(String)  # error message if any
+    message = Column(String, nullable=True)  # error message if any
 

@@ -59,6 +59,16 @@ install_service () {
     echo '################################'
     echo 'INSTALLING SYSTEMD SERVICE '
     echo '################################'
+    echo ' '
+    echo 'The name of your device must be unique and well recognizable in the LiveORC front-end. '
+    DEVICE_NAME="$(hostname)"
+    echo "The current name of your device is $DEVICE_NAME."
+    read -p "Do you want to change this? [Y/n]" YN
+    case $YN in
+        [Yy]* ) read -e -p "Enter your new device name: " DEVICE_NAME; hostnamectl set-hostname $DEVICE_NAME;;
+        * ) echo "No changes in device name made";;
+    esac
+    echo "Your device name is $DEVICE_NAME"
     cat > nodeorc.service <<EOF
 [Unit]
 Description=NodeOpenRiverCam operational edge or cloud compute instance
