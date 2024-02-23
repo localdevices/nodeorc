@@ -160,25 +160,46 @@ def start(storage, listen, task_form):
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
-        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
+        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
+                              '"--storage remote").')
     if listen == "local":
         # get the stored configuration
         config = nodeorc.config.get_active_config(session, parse=True)
         # read the task form from the configuration
         task_form_template = nodeorc.config.get_active_task_form(session, parse=True)
+        callback_url = config.callback_url
         if task_form_template is None:
             # go into the task form get daemon and try to acquire a task form from server every 5 minutes
-            callback_url = config.callback_url
-            nodeorc.tasks.fetch_task_form(session, callback_url, device, logger=logger)
-        # validate the settings into a task model
-        # with open(task_form, "r") as f:
-        #     task_form_template = json.load(f)
-        task_form_template = json.loads(task_form_template)
+            logger.info("Awaiting task by requesting a new task every 5 seconds")
+            nodeorc.tasks.wait_for_task_form(
+                session=session,
+                callback_url=callback_url,
+                device=device,
+                logger=logger
+            )
+        else:
+            # check for a new form with one single request
+            logger.info("Checking if a new task form is available for me...")
+            new_task_form_row = nodeorc.tasks.request_task_form(
+                session=session,
+                callback_url=callback_url,
+                device=device,
+                logger=logger
+            )
+            if new_task_form_row:
+                task_form_template = new_task_form_row.task_body
         # verify that task_template can be converted to a valid Task
         try:
             task_test = nodeorc.models.Task(**task_form_template)
         except Exception as e:
-            logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
+            logger.error(
+                f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}"
+            )
+            # This only happens with version upgrades. Update the status to BROKEN and report back to platform
+            task_form_template = nodeorc.config.get_active_task_form(session, parse=False)
+            task_form_template.status = nodeorc.db.models.TaskFormStatus.BROKEN
+            device.form_status = nodeorc.db.models.DeviceFormStatus.BROKEN_FORM
+            session.commit()
         try:
             processor = nodeorc.tasks.LocalTaskProcessor(
                 task_form_template=task_form_template,

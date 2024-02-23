@@ -148,6 +148,13 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
         if len(query.all()) == 0:
             return None
     task_form = query.first()
+    # check if task body can be parsed. If version upgrade occurred this may turn invalid
     if parse:
-        task_form = task_form.body
+        task_form = task_form.task_body
     return task_form
+
+def update_task_form_status(session, id, status=db_models.TaskFormStatus.BROKEN):
+    """
+    Usually used to update the status of a task to BROKEN in case the form is no longer valid
+
+    """
