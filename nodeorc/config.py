@@ -152,3 +152,20 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
     if parse:
         task_form = task_form.task_body
     return task_form
+
+def patch_active_config_to_accepted():
+    """If active config is still CANDIDATE, upgrade to ACCEPTED """
+    task_form_row = get_active_task_form(db.session)
+    if task_form_row.status == db.models.TaskFormStatus.CANDIDATE:
+        # also retrieve the accepted
+        task_form_row_accepted = get_active_task_form(
+            db.session,
+            allow_candidate=False
+        )
+        # now change the statusses
+        if task_form_row_accepted:  # it may also be that there are no ACCEPTED forms yet
+            task_form_row_accepted.status = db.models.TaskFormStatus.ANCIENT
+        task_form_row.status = db.models.TaskFormStatus.ACCEPTED
+        db.session.commit()
+
+

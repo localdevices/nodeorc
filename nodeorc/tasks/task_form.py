@@ -73,6 +73,8 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
 def request_task_form(session, callback_url, device, logger=logging):
     try:
         url = urljoin(str(callback_url.url), f"/api/device/{device.id}/get_task_form/")
+        url_patch = urljoin(str(callback_url.url), f"/api/device/{device.id}/patch_task_form/")
+
         headers = {"Authorization": f"Bearer {callback_url.token_access}"}
         t_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         if datetime.utcnow() > callback_url.token_expiration:
@@ -105,6 +107,17 @@ def request_task_form(session, callback_url, device, logger=logging):
                 device.form_status = DeviceFormStatus.VALID_FORM
                 # store the task form in the database
                 task_form_rec = TaskForm(**task_form)
+                task_patch = {
+                    "id": task_form["id"],
+                    "status": TaskFormStatus.ACCEPTED.value
+                }
+
+            else:
+                task_patch = {
+                    "id": task_form["id"],
+                    "status": TaskFormStatus.REJECTED.value
+                }
+
             # find if there is a status.CANDIDATE task form
             query = session.query(TaskForm)
             query.filter_by(status=TaskFormStatus.CANDIDATE)
@@ -114,6 +127,13 @@ def request_task_form(session, callback_url, device, logger=logging):
             # store the new validated task form as candidate
             session.add(task_form_rec)
             session.commit()
+
+            # patch the task to get feedback on the other side of the line
+            r = requests.patch(
+                url_patch,
+                data=task_patch,
+                headers=headers
+            )
             return task_form_rec
 
     except:
