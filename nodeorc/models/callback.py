@@ -2,10 +2,10 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
 from pydantic import field_validator, BaseModel
 
-import nodeorc.db.models
 # nodeodm specific imports
-from nodeorc import callbacks
-from nodeorc.models import File, Storage
+from .. import db
+from .. import callbacks
+from . import File, Storage
 
 class Callback(BaseModel):
     timestamp: datetime = datetime.now()
@@ -34,8 +34,8 @@ class Callback(BaseModel):
 
 
     def to_db(self):
-        rec = nodeorc.db.models.Callback(
+        rec = db.models.Callback(
             body=self.model_dump_json()
         )
-        nodeorc.db.session.add(rec)
-        nodeorc.db.session.commit()
+        db.session.add(rec)
+        db.session.commit()

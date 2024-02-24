@@ -7,7 +7,6 @@ from pyorc import service
 from io import BytesIO
 
 # nodeodm specific imports
-from nodeorc import callbacks
 from . import Callback
 from . import File
 

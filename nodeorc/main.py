@@ -3,15 +3,17 @@ import json
 import os
 
 import nodeorc
-# from nodeorc import log, models, tasks, __version__
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
 # from nodeorc import settings_path, db, config
 
-# globally required variables
-session = nodeorc.db.session
-logger = nodeorc.log.start_logger(True, False)
+# import nodeorc specifics
+from . import db, log, models, config, tasks, settings_path, __version__
+
+
+session = db.session
+logger = log.start_logger(True, False)
 
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
@@ -19,16 +21,16 @@ load_dotenv()
 temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
-device = session.query(nodeorc.db.models.Device).first()
+device = session.query(db.models.Device).first()
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
-    fields = [f for f in dir(nodeorc.db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
+    fields = [f for f in dir(db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
     docs = """JSON-file should contain the following settings: \n"""
     docs += """================================================\n\n"""
     for f in fields:
-        attr_doc = getattr(nodeorc.db.models.ActiveConfig, f).comment
+        attr_doc = getattr(db.models.ActiveConfig, f).comment
         docs += " {} : {}\n\n".format(f, attr_doc)
     return docs
 
@@ -37,7 +39,7 @@ def load_config(config_fn):
     if os.path.isfile(config_fn):
         try:
             with open(config_fn, "r") as f:
-                settings = nodeorc.models.LocalConfig(**json.load(f))
+                settings = models.LocalConfig(**json.load(f))
             return settings
         except ValidationError as e:
             raise ValueError(
@@ -105,7 +107,7 @@ task_form_opt = click.option(
     "--task_form",
     type=click.Path(exists=True),
     help="location of the task form .json file",
-    default=os.path.join(nodeorc.settings_path, "task_form.json")
+    default=os.path.join(settings_path, "task_form.json")
 )
 
 # Callback function for each process task that is queued.
@@ -124,7 +126,7 @@ task_form_opt = click.option(
 #
 # @click.command()
 @click.group()
-@click.version_option(nodeorc.__version__, message="NodeOpenRiverCam version: %(version)s")
+@click.version_option(__version__, message="NodeOpenRiverCam version: %(version)s")
 @click.option(
     "--license",
     default=False,
@@ -161,24 +163,52 @@ def start(storage, listen, task_form):
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
-        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ("--storage remote").')
+        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
+                              '"--storage remote").')
     if listen == "local":
         # get the stored configuration
-        config = nodeorc.config.get_active_config(session, parse=True)
-        # validate the settings into a task model
-        with open(task_form, "r") as f:
-            task_form_template = json.load(f)
+        active_config = config.get_active_config(session, parse=True)
+        # read the task form from the configuration
+        task_form_template = config.get_active_task_form(session, parse=True)
+        callback_url = active_config.callback_url
+        if task_form_template is None:
+            # go into the task form get daemon and try to acquire a task form from server every 5 minutes
+            logger.info("Awaiting task by requesting a new task every 5 seconds")
+            tasks.wait_for_task_form(
+                session=session,
+                callback_url=callback_url,
+                device=device,
+                logger=logger
+            )
+        else:
+            # check for a new form with one single request
+            logger.info("Checking if a new task form is available for me...")
+            new_task_form_row = tasks.request_task_form(
+                session=session,
+                callback_url=callback_url,
+                device=device,
+                logger=logger
+            )
+            if new_task_form_row:
+                task_form_template = new_task_form_row.task_body
         # verify that task_template can be converted to a valid Task
         try:
-            task_test = nodeorc.models.Task(**task_form_template)
+            task_test = models.Task(**task_form_template)
         except Exception as e:
-            logger.error(f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}")
+            logger.error(
+                f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}"
+            )
+            # This only happens with version upgrades. Update the status to BROKEN and report back to platform
+            task_form_template = config.get_active_task_form(session, parse=False)
+            task_form_template.status = db.models.TaskFormStatus.BROKEN
+            device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
+            session.commit()
         try:
-            processor = nodeorc.tasks.LocalTaskProcessor(
+            processor = tasks.LocalTaskProcessor(
                 task_form_template=task_form_template,
                 temp_path=temp_path,
                 logger=logger,
-                **config.model_dump()
+                **active_config.model_dump()
             )
             processor.await_task()
         except Exception as e:
@@ -206,7 +236,7 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config = load_config(json_file)
-    rec = config.add_config(session, config=config, set_as_active=set_as_active)
+    rec = nodeorc.config.add_config(session, config=config, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 upload_config.__doc__ = get_docs_settings()

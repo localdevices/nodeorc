@@ -1,14 +1,41 @@
 import datetime
+import enum
 import json
 import psutil
 import platform
+import socket
 import uuid
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Table, DateTime, JSON, Boolean, Float
-from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
+from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
-import nodeorc.models
+from .. import models
+
+
+class TaskFormStatus(enum.Enum):
+    NEW = 1  # task form that does not pass through validation
+    REJECTED = 2  # task form that does not pass through validation
+    ACCEPTED = 3  # currently active task form
+    CANDIDATE = 4  # New form, that passed validation, but not yet trialled on a full video
+    ANCIENT = 5  # surpassed and no longer available for replacement
+    BROKEN = 6  # task form used to be valid but no longer, e.g. due to upgrade of version of nodeorc
+
+
+class DeviceStatus(enum.Enum):
+    HEALTHY = 0
+    LOW_VOLTAGE = 1
+    LOW_STORAGE = 2
+    CRITICAL_STORAGE = 3
+
+
+class DeviceFormStatus(enum.Enum):
+    NOFORM = 0  # set at start of device.
+    VALID_FORM = 1 # Valid form available
+    INVALID_FORM = 1  # if only an invalid form is available
+    BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
+
+
 Base = declarative_base()
 
 
@@ -17,6 +44,11 @@ class Device(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4()
+    )
+    name = Column(
+        String,
+        nullable=False,
+        default=socket.gethostname()
     )
     created_at = Column(
         DateTime,
@@ -39,6 +71,9 @@ class Device(Base):
         default=psutil.virtual_memory().total / (1024**3)
         # default=os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024**3)
     )
+    status = Column(Enum(DeviceStatus), default=DeviceStatus.HEALTHY)
+    form_status = Column(Enum(DeviceFormStatus), default=DeviceFormStatus.NOFORM)
+    message = Column(String, nullable=True)  # error message if any
 
     def __str__(self):
         return "{}".format(self.id)
@@ -46,6 +81,18 @@ class Device(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
+    @property
+    def as_dict(self):
+        device_info = {
+            key: value for key, value in self.__dict__.items() if not key.startswith('_') and not callable(value)
+        }
+        # replace the datetime by a time string
+        device_info["created_at"] = self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        device_info["id"] = str(self.id)
+        device_info["status"] = self.status.value
+        device_info["form_status"] = self.form_status.value
+
+        return device_info
 
 class Settings(Base):
     __tablename__ = 'settings'
@@ -249,5 +296,16 @@ class Callback(Base):
     @property
     def callback(self):
         body = json.loads(self.body)
-        return nodeorc.models.Callback(**body)
+        return models.Callback(**body)
+
+
+class TaskForm(Base):
+    __tablename__ = "task_form"
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True
+    )
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
+    task_body = Column(JSON)
+    message = Column(String, nullable=True)  # error message if any
 

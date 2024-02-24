@@ -3,7 +3,8 @@ import shutil
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, AnyHttpUrl
 # nodeodm specific imports
-from nodeorc import callbacks, utils
+
+from .. import callbacks, utils
 
 class Storage(BaseModel):
     url: str = "./tmp"

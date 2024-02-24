@@ -14,8 +14,10 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from . import models, disk_management, db
+from .. import models, disk_management, db, config
+from . import request_task_form
 
+device = db.session.query(db.models.Device).first()
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
 
@@ -27,16 +29,6 @@ class LocalTaskProcessor:
             storage: models.Storage,
             settings: models.Settings,
             temp_path: str,
-            # incoming_path: str,
-            # failed_path: str,
-            # success_path: str,
-            # results_path: str,
-            # parse_dates_from_file: bool,
-            # video_file_fmt: str,
-            # water_level_fmt: str,
-            # water_level_datetimefmt: str,
-            # allowed_dt: float,
-            # shutdown_after_task: bool,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
@@ -45,17 +37,7 @@ class LocalTaskProcessor:
         self.task_form_template = task_form_template
         self.settings = settings
         self.temp_path = temp_path
-        # self.incoming_path = incoming_path
-        # self.failed_path = failed_path
-        # self.success_path = success_path
-        # self.results_path = results_path
-        # self.parse_dates_from_file = parse_dates_from_file
-        # self.video_file_fmt = video_file_fmt
         self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
-        # self.water_level_ftm = water_level_fmt
-        # self.water_level_datetimefmt = water_level_datetimefmt
-        # self.allowed_dt = allowed_dt
-        # self.shutdown_after_task = shutdown_after_task
         self.disk_management = disk_management
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
@@ -175,11 +157,21 @@ class LocalTaskProcessor:
                 self.logger.warning(
                     f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
 
-
     def process_file(
             self,
             file_path,
     ):
+        # before any processing, check for new task forms online
+        new_task_form_row = request_task_form(
+            session=db.session,
+            callback_url=self.callback_url,
+            device=device,
+            logger=self.logger
+        )
+        if new_task_form_row:
+            # replace the task form template
+            self.task_form_template = new_task_form_row.task_body
+
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
             self.temp_path,
@@ -201,7 +193,11 @@ class LocalTaskProcessor:
                 )
             except Exception as e:
                 timestamp = None
-                raise ValueError(f"Could not get a logical timestamp from file {file_path}. Reason: {e}")
+                message = f"Could not get a logical timestamp from file {file_path}. Reason: {e}"
+                device.message = message
+                db.session.commit()
+                raise ValueError(message)
+                # set message on device
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
             storage = models.Storage(
@@ -223,9 +219,10 @@ class LocalTaskProcessor:
                     allowed_dt=self.settings["allowed_dt"]
                 )
             except Exception as e:
-                raise ValueError(
-                    f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
-                )
+                message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
+                device.message = message
+                db.session.commit()
+                raise ValueError(message)
             # create the task object from all data
             task = create_task(
                 self.task_form_template,
@@ -247,18 +244,36 @@ class LocalTaskProcessor:
                     self.settings["success_path"],
                     timestamp.strftime("%Y%m%d")
                 )
+            # video is success, if task form is still CANDIDATE, upgrade to ACCEPTED
+            config.patch_active_config_to_accepted()
             # perform the callbacks here only when video was successfully completed
-            callback_success = self.post_callbacks(task.callbacks)
+            callback_success = self._post_callbacks(task.callbacks)
 
         except Exception as e:
             callback_success = False  # video was unsuccessful so callbacks are also not successful
-            self.logger.error(f"Error processing {file_path}: {str(e)}")
+            message = f"Error processing {file_path}: {str(e)}"
+            device.message = message
+            db.session.commit()
+            self.logger.error(message)
             # find back the file and place in the failed location, organised per day
             if timestamp:
                 dst_path = os.path.join(self.settings["failed_path"], timestamp.strftime("%Y%m%d"))
             else:
                 dst_path = self.settings["failed_path"]
+            # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
+            task_form_template = config.get_active_task_form(db.session, parse=False)
 
+        # set files and cleanup
+        self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
+        # once done, the file is removed from list of considered files for processing
+        self.processed_files.remove(file_path)
+        # if callbacks were successful, try to send off old callbacks that were not successful earlier
+        self._post_old_callbacks()
+        # shutdown if configured to shutdown after task
+        self._shutdown_or_not()
+
+    def _set_results_to_final_path(self, cur_path, dst_path, filename, task_path):
+        """ move the results from temp to final destination and cleanup """
         if not os.path.isdir(dst_path):
             os.makedirs(dst_path)
         dst = os.path.join(dst_path, filename)
@@ -267,22 +282,14 @@ class LocalTaskProcessor:
 
         if os.path.isdir(task_path):
             # remove any left over temporary files
-            shutil.rmtree((task_path))
-        # once done, the file is removed from list of considered files for processing
-        self.processed_files.remove(file_path)
-        # if callbacks were successful, try to send off old callbacks that were not successful earlier
-        self.post_old_callbacks()
-        # shutdown if configured to shutdown after task
-        self.shutdown_or_not()
+            shutil.rmtree(task_path)
 
-
-    def shutdown_or_not(self):
+    def _shutdown_or_not(self):
         if self.shutdown_after_task:
             self.logger.info("Task done! Shutting down...")
             os.system("/sbin/shutdown -h now")
 
-
-    def post_callbacks(self, callbacks):
+    def _post_callbacks(self, callbacks):
         """
         Performs callbacks in a list, and returns True when all were successful
 
@@ -321,7 +328,7 @@ class LocalTaskProcessor:
 
         return success
 
-    def post_old_callbacks(self):
+    def _post_old_callbacks(self):
         callback_records = db.session.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
@@ -447,10 +454,17 @@ def create_task(
     # callback jsons are converted to Callback objects
     callbacks = []
     for cb in task_form["callbacks"]:
+        # replace/remove time stamp
+        cb.pop("timestamp")
+        cb.pop("storage")
         if "file" in cb:
-            cb["file"] = output_files[cb["file"]]
+            file = cb.pop("file")
+            if file:
+                cb["file"] = output_files[file]
         if "files_to_send" in cb:
-            cb["files_to_send"] = {fn: output_files[fn] for fn in cb["files_to_send"]}
+            files_to_send = cb.pop("files_to_send")
+            if files_to_send:
+                cb["files_to_send"] = {fn: output_files[fn] for fn in files_to_send}
         cb_obj = models.Callback(
             storage=storage,
             timestamp=timestamp,
@@ -458,6 +472,9 @@ def create_task(
         )
         callbacks.append(cb_obj)
 
+    # remove instantaneous keys
+    task_form.pop("id")
+    task_form.pop("timestamp")
     # replace input and output files
     for repl_arg in REPLACE_ARGS:
         if repl_arg in task_form:
@@ -477,47 +494,3 @@ def create_task(
     # replace output to a uuid-formed output path
     task.subtasks[0].kwargs["output"] = os.path.join(task_path, "OUTPUT")
     return task
-# def local_tasks(
-#         task_template,
-#         temp_path,
-#         incoming_video_path=settings.incoming_path,
-#         logger=logging
-# ):
-#     # Create an event object
-#     if settings is None:
-#         raise IOError("For local processing, a settings file must be present in /settings/config.json. Please create or modify your settings accordingly")
-#     logger.info(f"Start listening to new videos in folder {incoming_video_path}")
-#     nodeorc_event = threading.Event()
-#     logger.info(f"I am monitoring {incoming_video_path}")
-#
-#     # make a list for processed files or files that are being processed so that they are not duplicated
-#     processed_files = set()
-#
-#     # Create and start the thread
-#     nodeorc_thread = threading.Thread(
-#         target=folder_monitor,
-#         args=(
-#             incoming_video_path,
-#             temp_path,
-#             task_template,
-#             logger,
-#             processed_files,
-#             nodeorc_event,
-#             2
-#         )
-#     )
-#     nodeorc_thread.start()
-#     try:
-#         # Your main program can continue running here
-#         while not nodeorc_event.is_set():
-#             time.sleep(1)
-#         print("Folder monitor event was triggered. Exiting the program.")
-#     except KeyboardInterrupt:
-#         # Handle Ctrl+C to stop the program
-#         nodeorc_event.set()
-#         nodeorc_thread.join()
-#     # Cleanup and exit
-#     print("Program terminated.")
-#
-#
-#

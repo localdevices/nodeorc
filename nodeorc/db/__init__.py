@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Device
 from . import active_config
-from nodeorc import __home__
+from .. import __home__
 
 db_path = os.path.join(
     __home__, "nodeorc.db"

@@ -159,7 +159,7 @@ class Task(BaseModel):
         with open(fn, "w") as f:
             f.write(self.to_json(indent=4, **kwargs))
 
-    def to_json(self, indent=0, template=False, serialize=True):
+    def to_json(self, indent=4, template=False, serialize=True):
         """
         Write task to fully serializable json format
 
