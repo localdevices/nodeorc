@@ -8,8 +8,8 @@ import time
 from urllib.parse import urljoin
 import uuid
 
-from nodeorc.models import Task
-from nodeorc.db.models import TaskForm, TaskFormStatus, DeviceFormStatus
+from ..models import Task
+from ..db.models import TaskForm, TaskFormStatus, DeviceFormStatus
 
 
 def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging):

@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from nodeorc import models, disk_management, db
+from .. import models, disk_management, db
 
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
@@ -27,16 +27,6 @@ class LocalTaskProcessor:
             storage: models.Storage,
             settings: models.Settings,
             temp_path: str,
-            # incoming_path: str,
-            # failed_path: str,
-            # success_path: str,
-            # results_path: str,
-            # parse_dates_from_file: bool,
-            # video_file_fmt: str,
-            # water_level_fmt: str,
-            # water_level_datetimefmt: str,
-            # allowed_dt: float,
-            # shutdown_after_task: bool,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
@@ -45,17 +35,7 @@ class LocalTaskProcessor:
         self.task_form_template = task_form_template
         self.settings = settings
         self.temp_path = temp_path
-        # self.incoming_path = incoming_path
-        # self.failed_path = failed_path
-        # self.success_path = success_path
-        # self.results_path = results_path
-        # self.parse_dates_from_file = parse_dates_from_file
-        # self.video_file_fmt = video_file_fmt
         self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
-        # self.water_level_ftm = water_level_fmt
-        # self.water_level_datetimefmt = water_level_datetimefmt
-        # self.allowed_dt = allowed_dt
-        # self.shutdown_after_task = shutdown_after_task
         self.disk_management = disk_management
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
@@ -258,6 +238,8 @@ class LocalTaskProcessor:
                 dst_path = os.path.join(self.settings["failed_path"], timestamp.strftime("%Y%m%d"))
             else:
                 dst_path = self.settings["failed_path"]
+            # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
+            task_form_template = config.get_active_task_form(session, parse=False)
 
         if not os.path.isdir(dst_path):
             os.makedirs(dst_path)

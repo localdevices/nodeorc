@@ -10,7 +10,7 @@ from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
-import nodeorc.models
+from .. import models
 
 
 class TaskFormStatus(enum.Enum):
@@ -296,7 +296,7 @@ class Callback(Base):
     @property
     def callback(self):
         body = json.loads(self.body)
-        return nodeorc.models.Callback(**body)
+        return models.Callback(**body)
 
 
 class TaskForm(Base):

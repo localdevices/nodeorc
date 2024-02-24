@@ -3,14 +3,13 @@ import sys
 import logging
 import logging.handlers
 import os
-from nodeorc import __version__, __home__
+from . import __version__, __home__
 from datetime import datetime
 
 timestr = datetime.now().strftime("%Y%m%dT%H%M%S")
 datestr = datetime.now().strftime("%Y%m%d")
-from nodeorc import __home__
 FMT = "%(asctime)s - %(name)s - %(module)s - %(levelname)s - %(message)s"
-# logger = logging.getLogger(__name__)
+
 
 def setuplog(
     name: str = "nodeorc",

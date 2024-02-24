@@ -1,3 +1,4 @@
+"""NodeORC: Automated edge and cloud image-based discharge estimation with OpenRiverCam"""
 import os
 __version__ = "0.1.0"
 
@@ -14,3 +15,4 @@ from . import callbacks
 from . import disk_management
 from . import db
 from . import config
+

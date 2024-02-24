@@ -1,6 +1,6 @@
-from nodeorc.models import LocalConfig, RemoteConfig
+from .models import LocalConfig, RemoteConfig
 import json
-import nodeorc.db.models as db_models
+from . import db
 import sqlalchemy
 
 def add_config(
@@ -23,13 +23,13 @@ def add_config(
     """
     config_dict = json.loads(config.to_json())
 
-    settings_record = db_models.Settings(**config_dict["settings"])
-    disk_management_record = db_models.DiskManagement(**config_dict["disk_management"])
-    storage_record = db_models.Storage(**config_dict["storage"])
+    settings_record = db.models.Settings(**config_dict["settings"])
+    disk_management_record = db.models.DiskManagement(**config_dict["disk_management"])
+    storage_record = db.models.Storage(**config_dict["storage"])
     # callback_url_record = db_models.CallbackUrl(**config_dict["callback_url"])
     url = config.callback_url.model_dump()
     url["url"] = str(url["url"])
-    callback_url_record = db_models.CallbackUrl(**url)
+    callback_url_record = db.models.CallbackUrl(**url)
     session.add(settings_record)
     session.add(disk_management_record)
     session.add(storage_record)
@@ -59,7 +59,7 @@ def add_replace_active_config(
     """
     Set config as the currently active config
     """
-    active_configs = session.query(db_models.ActiveConfig)
+    active_configs = session.query(db.models.ActiveConfig)
     if len(active_configs.all()) == 0:
         # check if all records are present
         assert(
@@ -71,7 +71,7 @@ def add_replace_active_config(
         ]
         ), "No active configuration available yet, you need to supply settings, disk_management, storage and callback_url in your configuration. One or more are missing."
         # no active config yet, make a new one
-        active_config_record = db_models.ActiveConfig(
+        active_config_record = db.models.ActiveConfig(
             settings_id=settings_record.id,
             disk_management_id=disk_management_record.id,
             storage_id=storage_record.id,
@@ -107,10 +107,10 @@ def get_settings(session, id):
     -------
 
     """
-    return session.query(db_models.Settings).get(id)
+    return session.query(db.models.Settings).get(id)
 
 def get_active_config(session, parse=False):
-    active_configs = session.query(db_models.ActiveConfig)
+    active_configs = session.query(db.models.ActiveConfig)
     assert(len(active_configs.all()) == 1),\
         'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc upload-config --help" for more information'
     active_config = active_configs.first()
@@ -127,7 +127,7 @@ def get_active_config(session, parse=False):
 
 
 def get_active_task_form(session, parse=False, allow_candidate=True):
-    query = session.query(db_models.TaskForm)
+    query = session.query(db.models.TaskForm)
     if len(query.all()) == 0:
         # there are no task forms yet, return None
         return None
@@ -136,7 +136,7 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
     get_accepted = True
     if allow_candidate:
         # first check for a candidate
-        query_candidate = query.filter_by(status=db_models.TaskFormStatus.CANDIDATE)
+        query_candidate = query.filter_by(status=db.models.TaskFormStatus.CANDIDATE)
         if len(query_candidate.all()) > 0:
             # accepted task form not needed
             get_accepted = False
@@ -144,7 +144,7 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
 
     if get_accepted:
         # find the single task form that is active
-        query = query.filter_by(status=db_models.TaskFormStatus.ACCEPTED)
+        query = query.filter_by(status=db.models.TaskFormStatus.ACCEPTED)
         if len(query.all()) == 0:
             return None
     task_form = query.first()
@@ -152,9 +152,3 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
     if parse:
         task_form = task_form.task_body
     return task_form
-
-def update_task_form_status(session, id, status=db_models.TaskFormStatus.BROKEN):
-    """
-    Usually used to update the status of a task to BROKEN in case the form is no longer valid
-
-    """

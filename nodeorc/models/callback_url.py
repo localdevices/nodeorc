@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from pydantic import field_validator, BaseModel, AnyHttpUrl
 # nodeodm specific imports
-from nodeorc import callbacks
+from .. import callbacks
 from urllib.parse import urljoin
 
-from nodeorc import settings_path
-from nodeorc.db import session
+from .. import settings_path
+from ..db import session
 
 
 class Callback(BaseModel):

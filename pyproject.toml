@@ -3,7 +3,7 @@ requires = ["flit_core"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "nodeopenrivercam"
+name = "nodeorc"
 authors = [
   { name = "Hessel Winsemius", email = "winsemius@rainbowsensing.com" },
 ]
@@ -48,8 +48,8 @@ test = [
 docs = [
 ]
 
-full = ["nodeopenrivercam[io,extra,dev,test,doc]"]
-slim = ["orprofile[io]"]
+full = ["nodeorc[io,extra,dev,test,doc]"]
+slim = ["nodeorc[io]"]
 
 [project.urls]
 Source = "https://github.com/localdevices/nodeorc"
