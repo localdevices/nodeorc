@@ -61,15 +61,22 @@ install_service () {
     echo 'INSTALLING SYSTEMD SERVICE '
     echo "========================================================================"
     echo ' '
+    if ! test -f ${HOME}/venv/nodeorc/bin/activate
+    then
+        echo 'No virtual environment exists for nodeorc. please run ./setup.sh --nodeorc first.'
+        exit 1
+    fi
+    source ${HOME}/venv/nodeorc/bin/activate
     if ! command -v nodeorc
     then
         echo 'NodeORC is not yet installed, please run ./setup.sh --nodeorc first'
+        deactivate
         exit 1
     fi
     echo 'NodeORC is detected and installed. Continue to install service ...'
     echo 'The name of your device must be unique and well recognizable in the LiveORC front-end. '
     DEVICE_NAME="$(hostname)"
-    echo "The current name of your device is $DEVICE_NAME."
+    echo "The current name of your device is ${DEVICE_NAME}."
     read -p "Do you want to change this? [Y/n]" YN
     case $YN in
         [Yy]* ) read -e -p "Enter your new device name: " DEVICE_NAME; hostnamectl set-hostname $DEVICE_NAME;;
@@ -114,7 +121,10 @@ install_service () {
     jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
 
     # we now have a solid configuration file, now initialize the database, and upload this to the database
+
     nodeorc upload-config
+    # deactivate python environment
+    deactivate
 #    cat > nodeorc.service <<EOF
 #[Unit]
 #Description=NodeOpenRiverCam operational edge or cloud compute instance
