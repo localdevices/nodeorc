@@ -122,7 +122,7 @@ install_service () {
 
     # we now have a solid configuration file, now initialize the database, and upload this to the database
 
-    nodeorc upload-config
+    nodeorc upload-config ${CONFIG_NEW}
     # deactivate python environment
     deactivate
 #    cat > nodeorc.service <<EOF
