@@ -74,57 +74,108 @@ install_service () {
         exit 1
     fi
     echo 'NodeORC is detected and installed. Continue to install service ...'
-    echo 'The name of your device must be unique and well recognizable in the LiveORC front-end. '
+    echo ''
+    echo 'USER INPUT'
+    echo '------------------------------------------------------------------------'
+    echo 'We will need to collect some input from you to get NodeORC setup as a service.'
+    echo ''
+    echo 'The name of your device must be unique and well recognizable in the LiveORC front-end.'
     DEVICE_NAME="$(hostname)"
-    echo "The current name of your device is ${DEVICE_NAME}."
-    read -p "Do you want to change this? [Y/n]" YN
-    case $YN in
-        [Yy]* ) read -e -p "Enter your new device name: " DEVICE_NAME; hostnamectl set-hostname $DEVICE_NAME;;
-        * ) echo "No changes in device name made";;
-    esac
-    echo "Your device name is $DEVICE_NAME"
-
-#    read -p "Provide an ip-address or remote hostname (without /api/) where your LiveOpenRiverCam is available: " URL
-#    # remove trailing slah if any
-#    if [ "${URL: -1}" == "/" ] ; then export URL=${URL:0:-1} ; fi
-#    read -p "Provide your email login to ${URL}: " LOGIN
-#    read -s -p "Provide your password to ${URL}: " PASSWD
+#    echo "The current name of your device is ${DEVICE_NAME}."
+#    read -p "Do you want to change this? [Y/n]" YN
+#    case $YN in
+#        [Yy]* ) read -e -p "Enter your new device name: " DEVICE_NAME;;
+#        * ) echo "No changes in device name made";;
+#    esac
+#    echo "Your device name will be $DEVICE_NAME"
+#
+##    read -p "Provide an ip-address or remote hostname (without /api/) where your LiveOpenRiverCam is available: " URL
+##    # remove trailing slah if any
+##    if [ "${URL: -1}" == "/" ] ; then export URL=${URL:0:-1} ; fi
+##    read -p "Provide your email login to ${URL}: " LOGIN
+##    read -s -p "Provide your password to ${URL}: " PASSWD
     export URL="https://openrivercam.com"
     export LOGIN="winsemius@rainbowsensing.com"
     export PASSWD='^7JF!k93oqf$2EAl'
-    export data="{\"email\": \"${LOGIN}\", \"password\": \"${PASSWD}\"}"
-    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "$data")
+#    export data="{\"email\": \"${LOGIN}\", \"password\": \"${PASSWD}\"}"
+#    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "$data")
+#
+##    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "{
+##        \"email\": \"${LOGIN}\",
+##        \"password\": \"${PASSWD}\"
+##    }")
+#    if [[ $TOKEN = *"No active account"* ]]
+#    then
+#        echo "No active account found with provided credentials on ${URL}. Please contact your system administrator."
+#        exit 1
+#    fi
+#    if [ "$TOKEN" = "" ]
+#    then
+#        echo "Host name ${URL} does not exist. Please contact your system administrator or check if you are connected to internet."
+#        exit 1
+#    fi
+#    if [[ $TOKEN != *"access"* ]]
+#    then
+#        echo "${URL} seems to point to a OpenRiverCam server, but not to the right end point. Ensure you are not referring to any end points."
+#        exit 1
+#    fi
+#    export ACCESS=$(echo $TOKEN | grep -o '"access":"[^"]*' | grep -o '[^"]*$')
+#    export REFRESH=$(echo $TOKEN | grep -o '"refresh":"[^"]*' | grep -o '[^"]*$')
+#    export CONFIG_TEMPLATE="${SCRIPT_FOLDER}/settings/config.json"
+#    export CONFIG_NEW="${SCRIPT_FOLDER}/settings/config_device.json"
+    # ask for info on storage options
+    echo ''
+    echo 'For portable devices runnbing from SD-cards such as Raspberry-Pis we highly recommend to use an external device'
+    echo 'for all the storage, including temporary storage of e.g. video files. We allow for use of USB drives or'
+    echo 'pen drives that you can hot plug, and remove and replace as the drive may get full. If you use USB drives,'
+    echo "then you don't need to specify a folder, as automatically the root of the USB drive will be used."
+    echo 'If you wish to use another specific folder on your device (e.g. a separate SSD hard drive or other) then'
+    echo 'you must specify that folder'
+    echo ' '
+    echo "Do you want to use portable hot pluggable USB storage? [Y/n] "
+    read -s -N 1 USE_USB
+    case $USE_USB in
+        [Yy]* ) echo "USB storage will be used and mounted on /mnt/usb/"; export USE_USB="Yes"; NODEORC_DATA_PATH="/mnt/usb";;
+        * ) read -e -p "Please provide a valid path: " NODEORC_DATA_PATH; export USE_USB="No"; if [ ! -d $NODEORC_DATA_PATH ]; then echo "$NODEORC_DATA_PATH does not exist, please first make a valid data folder"; exit 1; fi;;
+    esac
 
-#    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "{
-#        \"email\": \"${LOGIN}\",
-#        \"password\": \"${PASSWD}\"
-#    }")
-    if [[ $TOKEN = *"No active account"* ]]
+    echo '------------------------------------------------------------------------'
+    echo "The NodeORC service will be setup with the following settings:"
+    echo '------------------------------------------------------------------------'
+    echo "Device name                               : ${DEVICE}"
+    echo "LiveORC server                            : ${URL}"
+    echo "LiveORC username                          : ${LOGIN}"
+    echo "LiveORC password                          : provided and valid (but not shown here :-)"
+    echo "Use USB storage Y/N                       : ${USE_USB}"
+    echo "NodeORC storage path                      : ${NODEORC_DATA_PATH}"
+    echo
+    echo "Do you wish to continue with these settings? [Y/n] "
+    read -s -N 1 CONTINUE
+    if [[ ! $CONTINUE == [Yy] ]]
     then
-        echo "No active account found with provided credentials on ${URL}. Please contact your system administrator."
-        exit 1
+        echo "You decided to stop the setup of the service. We hope to see you later."
+        exit 0
     fi
-    if [ "$TOKEN" = "" ]
-    then
-        echo "Host name ${URL} does not exist. Please contact your system administrator or check if you are connected to internet."
-        exit 1
-    fi
-    if [[ $TOKEN != *"access"* ]]
-    then
-        echo "${URL} seems to point to a OpenRiverCam server, but not to the right end point. Ensure you are not referring to any end points."
-        exit 1
-    fi
-    export ACCESS=$(echo $TOKEN | grep -o '"access":"[^"]*' | grep -o '[^"]*$')
-    export REFRESH=$(echo $TOKEN | grep -o '"refresh":"[^"]*' | grep -o '[^"]*$')
-    export CONFIG_TEMPLATE="${SCRIPT_FOLDER}/settings/config.json"
-    export CONFIG_NEW="${SCRIPT_FOLDER}/settings/config_device.json"
-    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
+    echo "We are now here"
 
-    # we now have a solid configuration file, now initialize the database, and upload this to the database
+    if [[ $USE_USB == "Yes" ]]
+    then
+        setup_usb_mount;
+    fi
 
-    nodeorc upload-config ${CONFIG_NEW}
-    # deactivate python environment
-    deactivate
+
+
+
+
+#    hostnamectl set-hostname $DEVICE_NAME
+#
+#    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
+#
+#    # we now have a solid configuration file, now initialize the database, and upload this to the database
+#
+#    nodeorc upload-config ${CONFIG_NEW}
+#    # deactivate python environment
+#    deactivate
 #    cat > nodeorc.service <<EOF
 #[Unit]
 #Description=NodeOpenRiverCam operational edge or cloud compute instance
@@ -141,7 +192,9 @@ install_service () {
 #WantedBy=multi-user.target
 #EOF
 #
-#echo 'moving systemd files to /etc/systemd/system'
+#    echo 'moving systemd files to /etc/systemd/system'
+#
+#    sudo cp
 #    sudo mv nodeorc.service /etc/systemd/system/
 #    # ensuring credentials are set correctly
 #    sudo chmod 644 /etc/systemd/system/nodeorc.service
@@ -169,6 +222,27 @@ main() {
     done
 }
 
+setup_usb_mount() {
+    export usb_mount_script="${SCRIPT_FOLDER}/service/usb-mount.sh"
+    export usb_mount_service="${SCRIPT_FOLDER}/service/usb-mount@.service"
+    export udev_rule_usb="${SCRIPT_FOLDER}/10-toggleusbstick.rules"
+
+    # move usb mount in place and make executable
+    echo "Making USB mount script available for running as a service"
+    sudo cp $usb_mount_script /usr/local/bin
+    # make usb mount script executable
+    sudo chmod +x /usr/local/bin/usb-mount.sh
+
+    # setup a systemctl service for mounting USB drives
+    echo "Setup USB mount service as systemd service"
+    sudo cp $usb_mount_service /etc/systemd/system
+    # setup new udev rules.
+    echo "Making new udev rules for mounting and unmounting USB storage"
+    sudo cp $udev_rule_usb /etc/udev/rules.d
+    echo "Reloading udev rules."
+    sudo udevadm control --reload-rules
+
+}
 logo() {
 
     echo '
@@ -206,6 +280,8 @@ logo() {
                      +++++**+*#+*+*#+==++++++++***+++++ **************  %%%%%%%%%%%%%%%%%%      @%%%%%%%%%%%%%@         %%%%%%%          %%%%@      %%%%%%%%    @%%%%%     %%%%@%%%%%%%%%    %%%%     %%%%%%
                          ++++++++#+#+++++**++++++++  *****************  %%%%%%%%%%%%%%%@        @%%%%%%%%%%%%%%          %%%%%           %%%%@        %%%%%%%%%%%%%%%%     %%%%%%%%%%%%%%   @%%%%%%%%%%%%%@
                               ++++++++++++++++   *********************  %%%%%%%%%%%             %%%%%%%%%%%%%%@          %%%%@           %%%%%           %%%%%%%%%%        %%%%%%%%%%%%%%      @%%%%%%%%
+
+
     '
 
 
