@@ -225,7 +225,7 @@ main() {
 setup_usb_mount() {
     export usb_mount_script="${SCRIPT_FOLDER}/service/usb-mount.sh"
     export usb_mount_service="${SCRIPT_FOLDER}/service/usb-mount@.service"
-    export udev_rule_usb="${SCRIPT_FOLDER}/10-toggleusbstick.rules"
+    export udev_rule_usb="${SCRIPT_FOLDER}/service/10-toggleusbstick.rules"
 
     # move usb mount in place and make executable
     echo "Making USB mount script available for running as a service"
@@ -236,11 +236,18 @@ setup_usb_mount() {
     # setup a systemctl service for mounting USB drives
     echo "Setup USB mount service as systemd service"
     sudo cp $usb_mount_service /etc/systemd/system
+    sudo systemctl daemon-reload
     # setup new udev rules.
     echo "Making new udev rules for mounting and unmounting USB storage"
     sudo cp $udev_rule_usb /etc/udev/rules.d
     echo "Reloading udev rules."
     sudo udevadm control --reload-rules
+
+    # now loop through usb devices and try to mount them using the new service
+    for device in /dev/sd[a-z]*
+    do
+        sudo systemctl start usb-mount@${device##*/} > /dev/null 2>&1
+    done
 
 }
 logo() {
