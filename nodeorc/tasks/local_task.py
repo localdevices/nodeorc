@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from .. import models, disk_management, db, config
+from .. import models, disk_mng, db, config
 from . import request_task_form
 
 device = db.session.query(db.models.Device).first()
@@ -38,7 +38,7 @@ class LocalTaskProcessor:
         self.settings = settings
         self.temp_path = temp_path
         self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
-        self.disk_management = disk_management
+        self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
         self.max_workers = max_workers
@@ -46,7 +46,7 @@ class LocalTaskProcessor:
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
         self.logger.info(f'Water levels will be searched for in {self.settings["water_level_fmt"]} using a datetime format "{self.settings["water_level_datetimefmt"]}')
-        self.logger.info(f"Start listening to new videos in folder {self.settings['incoming_path']}")
+        self.logger.info(f"Start listening to new videos in folder {self.disk_management.incoming_path}.")
         self.event = threading.Event()
 
         # Create and start the thread
@@ -77,8 +77,13 @@ class LocalTaskProcessor:
         disk_mng_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                file_paths = disk_management.scan_folder(
-                    self.settings["incoming_path"],
+                if not os.path.isdir(self.disk_management.home_folder):
+                    # usually happens when USB drive is removed
+                    self.logger.info(f"Home folder {self.disk_management.home_folder} is not available, probably disk is removed. Reboot to try to find disk.")
+                    os._exit(1)
+
+                file_paths = disk_mng.scan_folder(
+                    self.disk_management.incoming_path,
                     suffix=self.video_file_ext
                 )
                 for file_path in file_paths:
@@ -93,16 +98,16 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
-                if time.time() - disk_mng_t0 > self.disk_management["frequency"]:
+                if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
                     self.logger.info(
-                        f"Checking for disk space exceedance of {self.disk_management['min_free_space']}"
+                        f"Checking for disk space exceedance of {self.disk_management.min_free_space}"
                     )
-                    free_space = disk_management.get_free_space(
-                        self.disk_management["home_folder"]
+                    free_space = disk_mng.get_free_space(
+                        self.disk_management.home_folder
                     )
-                    if free_space < self.disk_management["min_free_space"]:
+                    if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
 
 
@@ -117,45 +122,45 @@ class LocalTaskProcessor:
             GB amount of free space currently available
 
         """
-        ret = disk_management.purge(
+        ret = disk_mng.purge(
             [
                 self.settings["success_path"],
                 self.settings["failed_path"],
             ],
             free_space=free_space,
-            min_free_space=self.disk_management["min_free_space"],
+            min_free_space=self.disk_management.min_free_space,
             logger=self.logger,
-            home=self.disk_management["home_folder"]
+            home=self.disk_management.home_folder
         )
         # if returned is False then continue purging the results path
         if not ret:
             self.logger.warning(f"Space after purging still not enough, purging results folder")
-            ret = disk_management.purge(
+            ret = disk_mng.purge(
                 [
                     self.settings["results_path"]
                 ],
                 free_space=free_space,
-                min_free_space=self.disk_management["min_free_space"],
+                min_free_space=self.disk_management.min_free_space,
                 logger=self.logger,
-                home=self.disk_management["home_folder"]
+                home=self.disk_management.home_folder
             )
         if not ret:
             self.logger.warning(f"Not enough space freed up. Checking for critical space.")
             # final computation of free space
-            free_space = disk_management.get_free_space(
-                self.disk_management["home_folder"],
+            free_space = disk_mng.get_free_space(
+                self.disk_management.home_folder,
             )
-            if free_space < self.disk_management["critical_space"]:
+            if free_space < self.disk_management.critical_space:
                 # shutdown the service to secure the device!
                 self.logger.error(
-                    f"Free space is under critical threshold of {self.disk_management['critical_space']}. Shutting down NodeORC service"
+                    f"Free space is under critical threshold of {self.disk_management.critical_space}. Shutting down NodeORC service"
                 )
                 os.system("/usr/bin/systemctl disable nodeorc")
                 os.system("/usr/bin/systemctl stop nodeorc")
                 sys.exit(1)
             else:
                 self.logger.warning(
-                    f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
+                    f"Free space is {free_space} which is not yet under critical space {self.disk_management.critical_space}. Please contact your supplier for information.")
 
     def process_file(
             self,
@@ -329,7 +334,8 @@ class LocalTaskProcessor:
         return success
 
     def _post_old_callbacks(self):
-        callback_records = db.session.query(db.models.Callback)
+        session_data = db.init_basedata.get_data_session()
+        callback_records = session_data.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
         success = True
@@ -350,8 +356,8 @@ class LocalTaskProcessor:
             if not(success):
                 # immediately stop the processing of callbacks
                 break
-            db.session.delete(callback_record)
-            db.session.commit()
+            session_data.delete(callback_record)
+            session_data.commit()
 
 
 def get_timestamp(

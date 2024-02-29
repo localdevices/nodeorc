@@ -1,6 +1,11 @@
 # Tests for config objects
 from nodeorc.models import LocalConfig
+from nodeorc import db
+
 from pydantic import ValidationError
+
+
+
 def test_local_config(
         settings,
         callback_url,
@@ -47,10 +52,10 @@ def test_add_config(session, config):
     # check also if a active record has been created
     assert(len(session.query(db.models.ActiveConfig).all()) == 1)
     assert(session.query(db.models.ActiveConfig).first().settings_id == 3)
-    config_record = config.get_active_config(session)
+    config_record = config.get_active_config()
     # turn record into a dict
     # config_dict = dict(config_record.__dict__)
-    config_retr = config.get_active_config(session, parse=True)
+    config_retr = config.get_active_config(parse=True)
     # # remove id and _sa_instance_state
     # config_dict.pop("_sa_instance_state")
     # config_dict.pop("id")

@@ -44,6 +44,8 @@ def scan_folder(incoming, clean_empty_dirs=True, suffix=None):
     incoming = list(np.atleast_1d(incoming))
     file_paths = []
     for folder in incoming:
+        if not folder:
+            return file_paths
         for root, paths, files in os.walk(folder):
             if clean_empty_dirs:
                 if len(paths) == 0 and len(files) == 0:

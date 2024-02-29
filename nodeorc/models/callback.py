@@ -3,9 +3,9 @@ from typing import Optional, Dict, Any, List, Union
 from pydantic import field_validator, BaseModel
 
 # nodeodm specific imports
-from .. import db
 from .. import callbacks
 from . import File, Storage
+
 
 class Callback(BaseModel):
     timestamp: datetime = datetime.now()
@@ -24,7 +24,6 @@ class Callback(BaseModel):
             raise ValueError(f"callback {v} not available in callbacks")
         return v
 
-
     def get_body(self):
         # get the name of callback
         func = getattr(callbacks, self.func_name)
@@ -32,8 +31,8 @@ class Callback(BaseModel):
         # data, files = func(task, subtask, tmp=tmp, **self.kwargs)
         return data, files
 
-
     def to_db(self):
+        from .. import db  # import lazily to prevent circular imports
         rec = db.models.Callback(
             body=self.model_dump_json()
         )

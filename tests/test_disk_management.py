@@ -1,5 +1,5 @@
 import os
-from nodeorc import disk_management
+from nodeorc import disk_mng
 import logging
 
 def test_scan_folder(local_video_sample):

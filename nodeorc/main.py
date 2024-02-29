@@ -34,6 +34,7 @@ def get_docs_settings():
         docs += " {} : {}\n\n".format(f, attr_doc)
     return docs
 
+
 def load_config(config_fn):
     # define local settings below
     if os.path.isfile(config_fn):
@@ -43,7 +44,8 @@ def load_config(config_fn):
             return settings
         except ValidationError as e:
             raise ValueError(
-                f"Settings file in {os.path.abspath(config_fn)} is not a valid local configuration file. Error: {e}")
+                f"Settings file in {os.path.abspath(config_fn)} contains errors. Error: {e}")
+
 
 def validate_env(env_var):
     if os.getenv(env_var) is None:
@@ -56,6 +58,7 @@ def validate_listen(ctx, param, value):
         validate_env("AMQP_CONNECTION_STRING")
 
     return value
+
 
 def validate_storage(ctx, param, value):
     if value == "local":
@@ -163,11 +166,17 @@ def start(storage, listen, task_form):
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
-        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
+        raise click.UsageError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
                               '"--storage remote").')
     if listen == "local":
         # get the stored configuration
-        active_config = config.get_active_config(session, parse=True)
+        active_config = config.get_active_config(parse=True)
+        if not(active_config):
+            raise click.UsageError('You do not yet have an active configuration. Upload an activate configuration '
+                                  'through the CLI. Type "nodeorc upload-config --help" for more information')
+
+        # initialize the database for storing data
+        session_data = db.init_basedata.get_data_session()
         # read the task form from the configuration
         task_form_template = config.get_active_task_form(session, parse=True)
         callback_url = active_config.callback_url
