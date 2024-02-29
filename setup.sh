@@ -162,46 +162,51 @@ install_service () {
     then
         setup_usb_mount;
     fi
+    echo "Setting hostname to ${DEVICE_NAME}"
+    hostnamectl set-hostname $DEVICE_NAME
 
+    echo "Setting up configuration with LiveORC connection to ${URL}..."
+    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
 
+    # we now have a solid configuration file, now initialize the database, and upload this to the database
+    export config_dbase=${HOME}/.nodeorc/nodeorc_config.db
+    if [[ -f ${config_dbase} ]]
+    then
+        echo "Removing old database file ${config_dbase}"
+        rm ${config_dbase}
+    fi
+    echo "Uploading configuration to a fresh database"
+    nodeorc upload-config ${CONFIG_NEW}
+    # deactivate python environment
+    deactivate
+    echo "Preparing nodeorc.service file for user ${USER}"
+    cat > nodeorc.service <<EOF
+[Unit]
+Description=NodeOpenRiverCam operational edge or cloud compute instance
+After=network.target
 
+[Service]
+# User=${USER}
+WorkingDirectory=${PWD}
+Environment="PATH=${HOME}/venv/nodeorc/bin"
+ExecStart=${HOME}/venv/nodeorc/bin/nodeorc start --storage local --listen local
+Restart=always
 
+[Install]
+WantedBy=multi-user.target
+EOF
 
-#    hostnamectl set-hostname $DEVICE_NAME
-#
-#    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
-#
-#    # we now have a solid configuration file, now initialize the database, and upload this to the database
-#
-#    nodeorc upload-config ${CONFIG_NEW}
-#    # deactivate python environment
-#    deactivate
-#    cat > nodeorc.service <<EOF
-#[Unit]
-#Description=NodeOpenRiverCam operational edge or cloud compute instance
-#After=network.target
-#
-#[Service]
-## User=${USER}
-#WorkingDirectory=${PWD}
-#Environment="PATH=${HOME}/venv/nodeorc/bin"
-#ExecStart=${HOME}/venv/nodeorc/bin/nodeorc start --storage local --listen local
-#Restart=always
-#
-#[Install]
-#WantedBy=multi-user.target
-#EOF
-#
-#    echo 'moving systemd files to /etc/systemd/system'
-#
-#    sudo cp
-#    sudo mv nodeorc.service /etc/systemd/system/
-#    # ensuring credentials are set correctly
-#    sudo chmod 644 /etc/systemd/system/nodeorc.service
-#    echo 'starting and enabling the pyorc service with systemd'
-#    sudo systemctl daemon-reload
-#    sudo systemctl start nodeorc.service
-#    sudo systemctl enable nodeorc.service
+    echo 'moving systemd files to /etc/systemd/system'
+    sudo mv nodeorc.service /etc/systemd/system/
+    # ensuring credentials are set correctly
+    sudo chmod 644 /etc/systemd/system/nodeorc.service
+    echo 'starting and enabling the pyorc service with systemd'
+    sudo systemctl daemon-reload
+    sudo systemctl start nodeorc.service
+    sudo systemctl enable nodeorc.service
+    echo "You are all set, no need to reboot. To check out live what is going on in the back end you may always type:"
+    echo ""
+    echo "sudo journalctl -u nodeorc.service -f"
 }
 
 main() {
