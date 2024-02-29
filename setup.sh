@@ -248,6 +248,11 @@ setup_usb_mount() {
     do
         sudo systemctl start usb-mount@${device##*/} > /dev/null 2>&1
     done
+    # if no USB devices are found, then exit
+    if [[ ! -d /mnt/usb ]]; then
+        echo "I was not able to find a USB device. Did you forget to insert one? I am shutting down..."
+        exit 1
+    fi
 
 }
 logo() {
