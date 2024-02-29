@@ -135,7 +135,7 @@ install_service () {
     echo "Do you want to use portable hot pluggable USB storage? [Y/n] "
     read -s -N 1 USE_USB
     case $USE_USB in
-        [Yy]* ) echo "USB storage will be used and mounted on /mnt/usb/"; export USE_USB="Yes"; NODEORC_DATA_PATH="/mnt/usb";;
+        [Yy]* ) echo "USB storage will be used and mounted on /mnt/usb/. PLEASE INSERT YOUR USB DRIVE NOW!"; export USE_USB="Yes"; NODEORC_DATA_PATH="/mnt/usb";;
         * ) read -e -p "Please provide a valid path: " NODEORC_DATA_PATH; export USE_USB="No"; if [ ! -d $NODEORC_DATA_PATH ]; then echo "$NODEORC_DATA_PATH does not exist, please first make a valid data folder"; exit 1; fi;;
     esac
 
