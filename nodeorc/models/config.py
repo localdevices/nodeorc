@@ -55,6 +55,26 @@ class DiskManagement(BaseModel):
             os.makedirs(p)
         return p
 
+    @property
+    def water_level_path(self):
+        p = os.path.join(self.home_folder, "water_level")
+        if not(os.path.isdir(p)):
+            os.makedirs(p)
+        return p
+
+    @property
+    def log_path(self):
+        p = os.path.join(self.home_folder, "log")
+        if not(os.path.isdir(p)):
+            os.makedirs(p)
+        return p
+
+    @property
+    def tmp_path(self):
+        p = os.path.join(self.home_folder, "tmp")
+        if not(os.path.isdir(p)):
+            os.makedirs(p)
+        return p
 
 class Settings(BaseModel):
     # incoming_path: DirectoryPath

@@ -13,15 +13,26 @@ from . import db, log, models, config, tasks, settings_path, __version__
 
 
 session = db.session
-logger = log.start_logger(True, False)
+# see if there is an active config, if not logger goes to $HOME/.nodeorc
+active_config = config.get_active_config(parse=True)
+if active_config:
+    log_path = active_config.disk_management.log_path
+else:
+    log_path = None
+logger = log.start_logger(
+    True,
+    False,
+    log_path=log_path
+)
 
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
-temp_path = os.getenv("TEMP_PATH", "./tmp")
+# temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 device = session.query(db.models.Device).first()
+
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
@@ -215,7 +226,6 @@ def start(storage, listen, task_form):
         try:
             processor = tasks.LocalTaskProcessor(
                 task_form_template=task_form_template,
-                temp_path=temp_path,
                 logger=logger,
                 **active_config.model_dump()
             )

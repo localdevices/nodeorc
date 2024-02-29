@@ -129,16 +129,20 @@ class Settings(BaseConfig):
         Boolean,
         default=True,
         nullable=False,
-        comment="Flag determining if dates should be read from file metadata (True, default) or from a datestring in the filename (False)"
+        comment="Flag determining if dates should be read from file metadata (True, default) or from a datestring in "
+                "the filename (False)"
     )
     video_file_fmt = Column(
         String,
         nullable=False,
-        comment="Filename template (excluding path) defining the file name convention of video files. The template contains a datestring format in between {} signs, e.g. video_{%Y%m%dT%H%M%S}.mp4"
+        comment="Filename template (excluding path) defining the file name convention of video files. The template "
+                "contains a datestring format in between {} signs, e.g. video_{%Y%m%dT%H%M%S}.mp4"
     )
     water_level_fmt = Column(
         String,
-        comment="Filename template (including path) defining the file name convention of files containing water levels. The template contains a datestring format in between {} signs, e.g. /home/orc/water_level/wl_{%Y%m%d}.txt"
+        comment="Filename template (excluding path) defining the file name convention of files containing water "
+                "levels. The template contains a datestring format in between {} signs, "
+                "e.g. wl_{%Y%m%d}.txt. Water level files are written to <nodeorc home folder>/water_level/"
     )
     water_level_datetimefmt = Column(
         String,
@@ -149,13 +153,15 @@ class Settings(BaseConfig):
         Float,
         default=3600,
         nullable=False,
-        comment="Float indicating the maximum difference in time allowed between a videofile time stamp and a water level time stamp to match them"
+        comment="Float indicating the maximum difference in time allowed between a videofile time stamp and a water "
+                "level time stamp to match them"
     )
     shutdown_after_task = Column(
         Boolean,
         default=False,
         nullable=False,
-        comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling scheme is implemented and is meant to save power only."
+        comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling "
+                "scheme is implemented and is meant to save power only."
     )
 
     def __str__(self):

@@ -28,7 +28,6 @@ class LocalTaskProcessor:
             callback_url: models.CallbackUrl,
             storage: models.Storage,
             settings: models.Settings,
-            temp_path: str,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
@@ -36,16 +35,16 @@ class LocalTaskProcessor:
     ):
         self.task_form_template = task_form_template
         self.settings = settings
-        self.temp_path = temp_path
         self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
         self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
         self.max_workers = max_workers
         self.logger = logger
+        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-        self.logger.info(f'Water levels will be searched for in {self.settings["water_level_fmt"]} using a datetime format "{self.settings["water_level_datetimefmt"]}')
+        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{self.settings["water_level_datetimefmt"]}')
         self.logger.info(f"Start listening to new videos in folder {self.disk_management.incoming_path}.")
         self.event = threading.Event()
 
@@ -179,7 +178,7 @@ class LocalTaskProcessor:
 
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
-            self.temp_path,
+            self.disk_management.tmp_path,
             str(task_uuid)
         )
         # ensure the tmp path is in place
@@ -206,7 +205,7 @@ class LocalTaskProcessor:
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
             storage = models.Storage(
-                url=str(self.settings["results_path"]),
+                url=str(self.disk_management.results_path),
                 bucket_name=timestamp.strftime("%Y%m%d")
             )
             # move the file to the intended bucket
@@ -219,7 +218,7 @@ class LocalTaskProcessor:
             try:
                 h_a = get_water_level(
                     timestamp,
-                    file_fmt=self.settings["water_level_fmt"],
+                    file_fmt=self.water_level_file_template,
                     datetime_fmt=self.settings["water_level_datetimefmt"],
                     allowed_dt=self.settings["allowed_dt"]
                 )
@@ -244,9 +243,9 @@ class LocalTaskProcessor:
             # process the task
             task.execute(task_path)
             # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if self.settings["success_path"]:
+            if self.disk_management.success_path:
                 dst_path = os.path.join(
-                    self.settings["success_path"],
+                    self.disk_management.success_path,
                     timestamp.strftime("%Y%m%d")
                 )
             # video is success, if task form is still CANDIDATE, upgrade to ACCEPTED
@@ -262,9 +261,9 @@ class LocalTaskProcessor:
             self.logger.error(message)
             # find back the file and place in the failed location, organised per day
             if timestamp:
-                dst_path = os.path.join(self.settings["failed_path"], timestamp.strftime("%Y%m%d"))
+                dst_path = os.path.join(self.disk_management.failed_path, timestamp.strftime("%Y%m%d"))
             else:
-                dst_path = self.settings["failed_path"]
+                dst_path = self.disk_management.failed_path
             # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
             task_form_template = config.get_active_task_form(db.session, parse=False)
 
