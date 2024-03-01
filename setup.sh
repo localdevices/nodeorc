@@ -5,10 +5,28 @@ man_help(){
     echo "Setup of nodeorc operational service Linux"
     echo "========================================================================"
     echo ''
+    echo 'This script is meant to fully deploy NodeORC on a device or cloud '
+    echo 'instance. It has been tested with Debian-like systems and Raspberry Pi.'
+    echo 'If installation issues arise, then please submit an issue on '
     echo ''
+    echo 'https://github.com/localdevices/nodeorc/issues'
+    echo ''
+    echo 'NOTES'
+    echo "========================================================================"
+
+    echo 'For Raspberry by you MUST use 64-bit Raspberry pi OS. The software does '
+    echo 'not work with 32-bit Raspberry Pi OS. '
+    echo ' '
+    echo 'Updating packages and installing them may take a significant time and'
+    echo ' requires a good internet connection. Please ensure that prerequisites'
+    echo '(good internet, enough time, enough coffee) are met before continuing.'
+    echo ' '
+    echo "========================================================================"
+
+
     echo 'Options:'
     echo '        --all'
-    echo '                         Install all dependencies, and software and libraries as is'
+    echo '                         Install all dependencies, software and setup of service in one go'
     echo ''
     echo '        --dependencies'
     echo '                         Install all dependencies'
@@ -19,6 +37,7 @@ man_help(){
     echo '        --service'
     echo '                         Install nodeorc operational service as systemd service with 15-minute timer'
     echo ''
+    echo 'The order in which you should install is (1) --dependencies (2) --nodeorc, (3) --service.'
     exit 0
 }
 
@@ -39,7 +58,9 @@ install_dependencies () {
         sudo apt install ffmpeg libsm6 libxext6 libgl1 python3-venv jq -y
     else
         echo "System unknown I can't help you with updating"
+        exit 1
     fi
+  echo 'Dependencies installed. Now install NodeORC.'
 }
 
 
@@ -53,6 +74,7 @@ install_nodeorc () {
         source $HOME/venv/nodeorc/bin/activate
         # install the current source code
         pip install .
+    echo 'NodeORC installed. Now setup the automated service.'
 }
 
 install_service () {
@@ -63,8 +85,11 @@ install_service () {
     export CONFIG_DBASE=${HOME}/.nodeorc/nodeorc_config.db
 
     echo "========================================================================"
-    echo 'INSTALLING SYSTEMD SERVICE '
+    echo 'CONFIGURE AND SETUP NODEORC AS A BACKGROUND SERVICE '
     echo "========================================================================"
+    echo ""
+    echo "In this installation part, NodeORC will be configured, and converted into an automatically running"
+    echo "background service"
     echo ' '
     if ! test -f ${HOME}/venv/nodeorc/bin/activate
     then
@@ -74,12 +99,12 @@ install_service () {
     source ${HOME}/venv/nodeorc/bin/activate
     if ! command -v nodeorc
     then
-        echo 'NodeORC is not yet installed, please run ./setup.sh --nodeorc first'
+        echo 'NodeORC is not yet successfully installed, please run ./setup.sh --nodeorc first'
         deactivate
         exit 1
     fi
     deactivate
-    echo 'NodeORC is detected and installed. Continue to install service ...'
+    echo 'is where NodeORC is detected and installed. Continue to install service ...'
     echo ''
     echo 'USER INPUT'
     echo '------------------------------------------------------------------------'
@@ -87,13 +112,14 @@ install_service () {
     echo ''
     echo 'The name of your device must be unique and well recognizable in the LiveORC front-end.'
     DEVICE_NAME="$(hostname)"
-    echo "The current name of your device is ${DEVICE_NAME}."
-    read -p "Do you want to change this? [Y/n]" CHANGE_DEVICE
+    echo "The current name of your device is ${DEVICE_NAME}. Do you want to change this? [Y/n] "
+    read -s -N 1 CHANGE_DEVICE
     case $CHANGE_DEVICE in
         [Yy]* ) read -e -p "Enter your new device name: " DEVICE_NAME; export CHANGE_DEVICE="Yes";;
-        * ) echo "No changes in device name made";export CHANGE_DEVICE="No";;
+        * ) echo "No changes in device name will be made";export CHANGE_DEVICE="No";;
     esac
     echo "Your device name will be $DEVICE_NAME"
+    echo ''
     # collect all information on LiveORC
     get_liveorc_data;
     # ask for info on storage options
@@ -115,10 +141,10 @@ install_service () {
     echo '------------------------------------------------------------------------'
     echo "The NodeORC service will be setup with the following settings:"
     echo '------------------------------------------------------------------------'
-    echo "Device name                               : ${DEVICE}"
+    echo "Device name                               : ${DEVICE_NAME}"
     echo "LiveORC server                            : ${URL}"
     echo "LiveORC username                          : ${LOGIN}"
-    echo "LiveORC password                          : provided and valid (but not shown here :-)"
+    echo "LiveORC password                          : ${PASSWD_STRING}"
     echo "Use USB storage Y/N                       : ${USE_USB}"
     echo "NodeORC storage path                      : ${NODEORC_DATA_PATH}"
     echo
@@ -149,7 +175,7 @@ install_service () {
 
 main() {
     #display parameters
-    echo 'Installation options: ' "$@"
+    echo 'Installation options provided: ' "$@"
     array=("$@")
     # if no parameters display help
     if [ -z "$array" ]                    ; then man_help                        ;fi
@@ -166,38 +192,65 @@ main() {
 }
 
 get_liveorc_data(){
-    read -p "Provide an ip-address or remote hostname (without /api/) where your LiveOpenRiverCam is available: " URL
-    # remove trailing slash if any
-    if [ "${URL: -1}" == "/" ] ; then export URL=${URL:0:-1} ; fi
-    read -p "Provide your email login to ${URL}: " LOGIN
-    read -s -p "Provide your password to ${URL}: " PASSWD
-#    export URL="https://openrivercam.com"
-#    export LOGIN="winsemius@rainbowsensing.com"
-#    export PASSWD='^7JF!k93oqf$2EAl'
-    export data="{\"email\": \"${LOGIN}\", \"password\": \"${PASSWD}\"}"
-    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "$data")
+    echo 'This NodeORC device can connect to a LiveORC server, give status updates, receive new tasks and submit'
+    echo 'results with callbacks. To enable this, you need to provide your LiveORC credentials. If you simply want to'
+    echo 'use the device stand-alone and configure it via SSH, and pick up data physically, then you can skip this step.'
+    echo ''
+    echo 'Do you want to connect to a LiveORC server? [Y/n] '
+    read -s -N 1 LIVEORC_YN
+    case $LIVEORC_YN in
+        [Yy]* ) export LIVEORC_YN="Yes";;
+        * ) export LIVEORC_YN="No";;
+    esac
+    if [ $LIVEORC_YN == "Yes" ]
+    then
+        read -p "Provide an ip-address or remote hostname (without /api/) where your LiveOpenRiverCam is available: " URL
+        # remove trailing slash if any
+        if [ "${URL: -1}" == "/" ] ; then export URL=${URL:0:-1} ; fi
+        read -p "Provide your email login to ${URL}: " LOGIN
+        read -s -p "Provide your password to ${URL}: " PASSWD
+        echo ''
+    #    export URL="https://openrivercam.com"
+    #    export LOGIN="winsemius@rainbowsensing.com"
+    #    export PASSWD='^7JF!k93oqf$2EAl'
+        export data="{\"email\": \"${LOGIN}\", \"password\": \"${PASSWD}\"}"
+        echo "Trying to receive access and refresh tokens from ${URL}/api/token/"
+        export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "$data")
 
-#    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "{
-#        \"email\": \"${LOGIN}\",
-#        \"password\": \"${PASSWD}\"
-#    }")
-    if [[ $TOKEN = *"No active account"* ]]
-    then
-        echo "No active account found with provided credentials on ${URL}. Please contact your system administrator."
-        exit 1
+    #    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "{
+    #        \"email\": \"${LOGIN}\",
+    #        \"password\": \"${PASSWD}\"
+    #    }")
+        if [[ $TOKEN = *"No active account"* ]]
+        then
+            echo "No active account found with provided credentials on ${URL}. Please contact your system administrator."
+            exit 1
+        fi
+        if [ "$TOKEN" = "" ]
+        then
+            echo "Host name ${URL} does not exist. Please contact your system administrator or check if you are "
+            echo "connected to internet."
+            exit 1
+        fi
+        if [[ $TOKEN != *"access"* ]]
+        then
+            echo "Tried to contact ${URL}/api/token/. The OpenRiverCam server exists,, but the end point seems "
+            echo "incorrect. Ensure you are not referring to any end points."
+            exit 1
+        fi
+        export ACCESS=$(echo $TOKEN | grep -o '"access":"[^"]*' | grep -o '[^"]*$')
+        export REFRESH=$(echo $TOKEN | grep -o '"refresh":"[^"]*' | grep -o '[^"]*$')
+        echo ''
+        echo "Successfully connected to ${URL}/api/token and I found a access and refresh token for you. These will be "
+        echo 'stored in the configuration'
+        echo ''
+        export PASSWD_STRING="provided and valid (but not shown here :-)"
+    else
+        export LOGIN="N/A"
+        export URL="N/A"
+        export PASSWD_STRING="N/A"
     fi
-    if [ "$TOKEN" = "" ]
-    then
-        echo "Host name ${URL} does not exist. Please contact your system administrator or check if you are connected to internet."
-        exit 1
-    fi
-    if [[ $TOKEN != *"access"* ]]
-    then
-        echo "${URL} seems to point to a OpenRiverCam server, but not to the right end point. Ensure you are not referring to any end points."
-        exit 1
-    fi
-    export ACCESS=$(echo $TOKEN | grep -o '"access":"[^"]*' | grep -o '[^"]*$')
-    export REFRESH=$(echo $TOKEN | grep -o '"refresh":"[^"]*' | grep -o '[^"]*$')
+
 }
 
 setup_usb_mount() {
