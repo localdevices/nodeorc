@@ -48,6 +48,24 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
         time.sleep(timeout)
 
 def request_task_form(session, callback_url, device, logger=logging):
+    """
+    request a task form, trying both remote and local retrieval
+
+    Parameters
+    ----------
+    session : sqlalchemy Session
+    callback_url : CallbackUrl
+            LiveORC URL and credentials
+    device : Device record
+        required to hand-shake and update status messages on LiveORC side
+    logger: Logging
+        NodeORC logger object
+
+    Returns
+    -------
+    task_form: TaskForm
+        database record containing all deserialized task form details
+    """
     task_form = request_remote_task_form(
         session,
         callback_url,
@@ -62,9 +80,28 @@ def request_task_form(session, callback_url, device, logger=logging):
             device,
             logger=logger
         )
-
+    return task_form
 
 def request_remote_task_form(session, callback_url, device, logger=logging):
+    """
+    Request task from LiveORC server
+
+    Parameters
+    ----------
+    session : sqlalchemy Session
+    callback_url : CallbackUrl
+            LiveORC URL and credentials
+    device : Device record
+        required to hand-shake and update status messages on LiveORC side
+    logger: Logging
+        NodeORC logger object
+
+    Returns
+    -------
+    task_form: TaskForm
+        database record containing all deserialized task form details
+
+    """
     try:
         url = urljoin(str(callback_url.url), f"/api/device/{device.id}/get_task_form/")
         url_patch = urljoin(str(callback_url.url), f"/api/device/{device.id}/patch_task_form/")
@@ -127,30 +164,26 @@ def request_remote_task_form(session, callback_url, device, logger=logging):
         return None
 
 
-def validate_task_body(task_body: dict, logger=logging):
+def request_local_task_form(session, config_file, device, logger=logging):
     """
-    Validates a newly received task form. If valid, it stores the task form as "status.CANDIDATE" so as the form can be
-    tried on a full run. Only after one run is finished successfully will the task form become the status.ACCEPTED
 
     Parameters
     ----------
-    task_form
+    session : sqlalchemy Session
+    config_file : str
+         Path to file containing configuration
+    device : Device record
+        required to hand-shake and update status messages on LiveORC side
+    logger: Logging
+        NodeORC logger object
 
     Returns
     -------
+    task_form: TaskForm
+        database record containing all deserialized task form details
+
 
     """
-    # check if the task form body is a valid task form template
-    try:
-        task_form_template = Task(**task_body)
-    except Exception as e:
-        logger.error(
-            f"Task form found but task body is invalid. Reason: {str(e)}")
-        return False
-    return True
-
-
-def request_local_task_form(session, config_file, device, logger=logging):
     if not os.path.isfile(config_file):
         return None
     logger.info(f"config file found at {config_file}")
@@ -179,7 +212,44 @@ def request_local_task_form(session, config_file, device, logger=logging):
     os.remove(config_file)
     return task_form_rec
 
+
+def validate_task_body(task_body: dict, logger=logging):
+    """
+    Validates a newly received task form. If valid, it stores the task form as "status.CANDIDATE" so as the form can be
+    tried on a full run. Only after one run is finished successfully will the task form become the status.ACCEPTED
+
+    Parameters
+    ----------
+    task_body: dict
+        serialized task form details
+
+    Returns
+    -------
+    bool
+    """
+
+    # check if the task form body is a valid task form template
+    try:
+        task_form_template = Task(**task_body)
+    except Exception as e:
+        logger.error(
+            f"Task form found but task body is invalid. Reason: {str(e)}")
+        return False
+    return True
+
+
 def save_new_task_form(session, task_form_rec):
+    """
+    Save a newly found task as CANDIDATE. also ensures that old CANDIDATE forms are made ANCIENT
+
+    Parameters
+    ----------
+    session : sqlalchemy Session
+    task_form_rec : TaskForm
+        task form record to store
+
+
+    """
     # find if there is a status.CANDIDATE task form
     query = session.query(TaskForm)
     query.filter_by(status=TaskFormStatus.CANDIDATE)
