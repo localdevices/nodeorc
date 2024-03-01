@@ -299,8 +299,13 @@ setup_nodeorc_config(){
         rm ${CONFIG_DBASE}
     fi
     echo "Uploading configuration to a fresh database"
+    echo ""
+    echo '------------------------------------------------------------------------'
+    echo "Your first NodeORC logs will appear below."
+    echo '------------------------------------------------------------------------'
     nodeorc upload-config ${CONFIG_NEW}
     # deactivate python environment
+    echo '------------------------------------------------------------------------'
     deactivate
 }
 
