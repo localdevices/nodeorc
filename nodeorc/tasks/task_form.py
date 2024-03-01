@@ -13,6 +13,9 @@ from ..models import Task
 from ..db.models import TaskForm, TaskFormStatus, DeviceFormStatus
 from .. import __home__
 
+config_file = os.path.join(__home__, "task_form.json")
+
+
 def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging):
     """
     Keep looking for a task form for the device, remotely and locally. When found, the service will shutdown
@@ -31,13 +34,12 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
 
     """
 
-    config_file = os.path.join(__home__, "task_form.json")
     while True:
         # keep on trying to get a new task form from configured server until successful
         task_form = request_task_form(session, callback_url, device, logger=logger)
         # also try to get a task form from local file
-        if not task_form:
-            task_form = request_local_task(config_file, session, device, logger=logger)
+        # if not task_form:
+        #     task_form = request_local_task(config_file, session, device, logger=logger)
         if task_form:
             # new task form found, reboot service
             logger.info("New task form setup. Reboot service...")
@@ -45,8 +47,24 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
 
         time.sleep(timeout)
 
-
 def request_task_form(session, callback_url, device, logger=logging):
+    task_form = request_remote_task_form(
+        session,
+        callback_url,
+        device,
+        logger=logger
+    )
+    # also try to get a task form from local file
+    if not task_form:
+        task_form = request_local_task_form(
+            session,
+            config_file,
+            device,
+            logger=logger
+        )
+
+
+def request_remote_task_form(session, callback_url, device, logger=logging):
     try:
         url = urljoin(str(callback_url.url), f"/api/device/{device.id}/get_task_form/")
         url_patch = urljoin(str(callback_url.url), f"/api/device/{device.id}/patch_task_form/")
@@ -66,7 +84,7 @@ def request_task_form(session, callback_url, device, logger=logging):
             headers=headers
         )
         if r.status_code == 204:
-            logger.info(f'No new task form found at {t_str}')
+            logger.info(f'No new task form found at {url}')
             return None
         if r.status_code == 200:
             # new message found, validate and if valid, exit(0)
@@ -132,7 +150,7 @@ def validate_task_body(task_body: dict, logger=logging):
     return True
 
 
-def request_local_task(config_file, session, device, logger=logging):
+def request_local_task_form(session, config_file, device, logger=logging):
     if not os.path.isfile(config_file):
         return None
     logger.info(f"config file found at {config_file}")
