@@ -69,7 +69,10 @@ def add_filehandler(logger, path, log_level=20, fmt=FMT):
         logger.debug(f"Writing log messages to new file {path}.")
 
 
-def start_logger(verbose, quiet, log_path=os.path.join(__home__, "log")):
+def start_logger(verbose, quiet, log_path=None):
+    if not log_path:
+        # set it here to a fixed location
+        log_path = os.path.join(__home__, "log")
     if verbose:
         verbose = 2
     else:

@@ -68,12 +68,12 @@ install_nodeorc () {
     echo "========================================================================"
     echo 'INSTALLING NODEOPENRIVERCAM'
     echo "========================================================================"
-        pip3 install virtualenv
         python3 -m venv $HOME/venv/nodeorc
         # activate the new environment
         source $HOME/venv/nodeorc/bin/activate
         # install the current source code
         pip install .
+        deactivate
     echo 'NodeORC installed. Now setup the automated service.'
 }
 
@@ -155,7 +155,7 @@ install_service () {
         echo "You decided to stop the setup of the service. We hope to see you later."
         exit 0
     fi
-    echo "We are now here"
+    echo ""
 
     if [[ $USE_USB == "Yes" ]]
     then
@@ -242,7 +242,7 @@ get_liveorc_data(){
         export REFRESH=$(echo $TOKEN | grep -o '"refresh":"[^"]*' | grep -o '[^"]*$')
         echo ''
         echo "Successfully connected to ${URL}/api/token and I found a access and refresh token for you. These will be "
-        echo 'stored in the configuration'
+        echo 'stored in the configuration.'
         echo ''
         export PASSWD_STRING="provided and valid (but not shown here :-)"
     else
