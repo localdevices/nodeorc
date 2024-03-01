@@ -460,8 +460,10 @@ def create_task(
     callbacks = []
     for cb in task_form["callbacks"]:
         # replace/remove time stamp
-        cb.pop("timestamp")
-        cb.pop("storage")
+        if "timestamp" in cb:
+            cb.pop("timestamp")
+        if "storage" in cb:
+            cb.pop("storage")
         if "file" in cb:
             file = cb.pop("file")
             if file:
@@ -478,8 +480,10 @@ def create_task(
         callbacks.append(cb_obj)
 
     # remove instantaneous keys
-    task_form.pop("id")
-    task_form.pop("timestamp")
+    if "id" in task_form:
+        task_form.pop("id")
+    if "timestamp" in task_form:
+        task_form.pop("timestamp")
     # replace input and output files
     for repl_arg in REPLACE_ARGS:
         if repl_arg in task_form:
