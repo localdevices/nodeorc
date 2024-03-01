@@ -1,0 +1,26 @@
+{
+    "callback_url": {
+        "url": "http://127.0.0.1:8000",
+        "token_refresh_end_point": "/api/token/refresh/",
+        "token_refresh": "",
+        "token_access": ""
+    },
+    "storage": {
+        "url": "./tmp",
+        "bucket_name": "examplevideo"
+    },
+    "settings": {
+        "parse_dates_from_file": true,
+        "video_file_fmt": "{%Y%m%d_%H%M%S}.mp4",
+        "water_level_fmt": "all_levels.txt",
+        "water_level_datetimefmt": "%Y%m%d_%H%M%S",
+        "allowed_dt": 3600,
+        "shutdown_after_task": false
+    },
+    "disk_management": {
+        "home_folder": "",
+        "min_free_space": 2,
+        "critical_space": 1,
+        "frequency": 3600
+    }
+}
