@@ -290,7 +290,7 @@ setup_nodeorc_config(){
     source ${HOME}/venv/nodeorc/bin/activate
 
     echo "Setting up configuration with LiveORC connection to ${URL}..."
-    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
+    jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\" | .disk_management.home_folder=\"${NODEORC_DATA_PATH}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
 
     # we now have a solid configuration file, now initialize the database, and upload this to the database
     if [[ -f ${CONFIG_DBASE} ]]
