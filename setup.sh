@@ -167,22 +167,24 @@ install_service () {
     if [[ $CHANGE_DEVICE == "Yes" ]]
     then
         echo "Setting hostname to ${DEVICE_NAME}"
-        hostnamectl set-hostname $DEVICE_NAME
+        sudo hostnamectl set-hostname $DEVICE_NAME
+        # also add hostname to list of hosts (2> /dev/null suppresses unknown host error)
+        echo -e "127.0.1.1\t$(hostname)" | sudo tee -a /etc/hosts 2> /dev/null
     fi
     setup_nodeorc_config;
     setup_service_files;
     echo "If no error messages appeared, you should be all set. If you want to login again, please use the command: "
     echo ""
-    echo "ssh $USER@$(hostname).local"
+    echo "$ ssh $USER@$(hostname).local"
     echo ""
     echo "After logging in, you can check live what's going on using the following command: "
     echo ""
-    echo "sudo journalctl -u nodeorc.service -f"
+    echo "$ sudo journalctl -u nodeorc.service -f"
     echo ""
     echo "Device needs to reboot. Do you want to reboot now? [Y/n] "
     echo ""
     read -s -N 1 CONTINUE
-    if [[ ! $CONTINUE == [Yy] ]]
+    if [[ $CONTINUE == [Yy] ]]
     then
         echo "Thank you for this setup. Bye bye."
         echo "Rebooting device $(hostname)"
