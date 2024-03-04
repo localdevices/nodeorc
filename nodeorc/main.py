@@ -171,8 +171,7 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 @cli.command(short_help="Start main daemon")
 @storage_opt
 @listen_opt
-@task_form_opt
-def start(storage, listen, task_form):
+def start(storage, listen):
     # get the device id
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
@@ -216,7 +215,7 @@ def start(storage, listen, task_form):
             task_test = models.Task(**task_form_template)
         except Exception as e:
             logger.error(
-                f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}"
+                f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
             )
             # This only happens with version upgrades. Update the status to BROKEN and report back to platform
             task_form_template = config.get_active_task_form(session, parse=False)
