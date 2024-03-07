@@ -6,12 +6,11 @@ NodeOpenRiverCam
 
 |pypi| |piwheels| |docs_latest| |license|
 
-.. note::
 
-    Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for their first release. The first
-    release of both OpenRiverCam components is planned in May 2024. Until that time please stay up to date on this
-    page. The documentation will change significantly during this period. We do not provide any feedback on questions
-    until the first release is out.
+  Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for their first release. The first
+  release of both OpenRiverCam components is planned in May 2024. Until that time please stay up to date on this
+  page. The documentation will change significantly during this period. We do not provide any feedback on questions
+  until the first release is out.
 
 What is NodeOpenRiverCam
 ========================
@@ -61,8 +60,6 @@ on linux devices) or a docker installation (also on Windows or Mac):
 
 Native installation
 -------------------
-
-.. note::
 
     NodeOpenRiverCam is entirely rasperry pi compliant. You do need an ARM64 bit device (Raspberry Pi 4 or higher)
     and about 1.5GB storage for the software, excluding the operating system. We recommend a SD card of 16GB, but
@@ -116,8 +113,6 @@ Usage
 
 Cloud processing
 ----------------
-
-.. note::
 
     We are still working on cloud-usage of NodeOpenRiverCam. Currently only edge processing is supported. Once this
     is supported, you can setup NodeOpenRiverCam on one or more cloud-nodes, connected to a LiveOpenRiverCam platform
@@ -194,14 +189,12 @@ from the file name. You will need to specify the file naming convention in the c
 be configured during the installation process, but you can also alter the video naming convention in the
 LiveOpenRiverCam platform by making a new configuration message for the device.
 
-A typical filename convention may for instance be:
+A typical filename convention (taken from our raspberry camera example) may for instance be:
 
 .. code-block::
 
-    ``%Y%m%d_%H%M%S.h264``
+    %Y%m%d_%H%M%S.h264
 
-
-.. note::
 
     The reconfiguration from LiveORC has not yet been implemented. This will be a feature in a upcoming release.
 
