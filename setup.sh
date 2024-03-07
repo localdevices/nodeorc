@@ -230,17 +230,10 @@ get_liveorc_data(){
         read -p "Provide your email login to ${URL}: " LOGIN
         read -s -p "Provide your password to ${URL}: " PASSWD
         echo ''
-    #    export URL="https://openrivercam.com"
-    #    export LOGIN="winsemius@rainbowsensing.com"
-    #    export PASSWD='^7JF!k93oqf$2EAl'
         export data="{\"email\": \"${LOGIN}\", \"password\": \"${PASSWD}\"}"
         echo "Trying to receive access and refresh tokens from ${URL}/api/token/"
         export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "$data")
 
-    #    export TOKEN=$(curl --silent --max-time 5 --location "${URL}/api/token/" --header 'Content-Type: application/json' --data-raw "{
-    #        \"email\": \"${LOGIN}\",
-    #        \"password\": \"${PASSWD}\"
-    #    }")
         if [[ $TOKEN = *"No active account"* ]]
         then
             echo "No active account found with provided credentials on ${URL}. Please contact your system administrator."
