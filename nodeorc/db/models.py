@@ -36,10 +36,15 @@ class DeviceFormStatus(enum.Enum):
     BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
 
 
-Base = declarative_base()
+# database components for configuration, remains static during most of the time, unless an update needs to be processed
+BaseConfig = declarative_base()
+
+# database components for storing incremental data, records are added with each video and callback, but database can
+# safely be removed, e.g. when disk is full
+BaseData = declarative_base()
 
 
-class Device(Base):
+class Device(BaseConfig):
     __tablename__ = "device"
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
@@ -94,45 +99,50 @@ class Device(Base):
 
         return device_info
 
-class Settings(Base):
+
+class Settings(BaseConfig):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    incoming_path = Column(
-        String,
-        nullable=False,
-        comment="Path to incoming videos"
-    )
-    failed_path = Column(
-        String,
-        nullable=False,
-        comment="Path to failed videos"
-    )
-    success_path = Column(
-        String,
-        nullable=False,
-        comment = "Path to successfully treated videos"
-    )
-    results_path = Column(
-        String,
-        nullable=False,
-        comment = "Path to results"
-    )
+    # incoming_path = Column(
+    #     String,
+    #     nullable=False,
+    #     comment="Path to incoming videos"
+    # )
+    # failed_path = Column(
+    #     String,
+    #     nullable=False,
+    #     comment="Path to failed videos"
+    # )
+    # success_path = Column(
+    #     String,
+    #     nullable=False,
+    #     comment = "Path to successfully treated videos"
+    # )
+    # results_path = Column(
+    #     String,
+    #     nullable=False,
+    #     comment = "Path to results"
+    # )
     parse_dates_from_file = Column(
         Boolean,
         default=True,
         nullable=False,
-        comment="Flag determining if dates should be read from file metadata (True, default) or from a datestring in the filename (False)"
+        comment="Flag determining if dates should be read from file metadata (True, default) or from a datestring in "
+                "the filename (False)"
     )
     video_file_fmt = Column(
         String,
         nullable=False,
-        comment="Filename template (excluding path) defining the file name convention of video files. The template contains a datestring format in between {} signs, e.g. video_{%Y%m%dT%H%M%S}.mp4"
+        comment="Filename template (excluding path) defining the file name convention of video files. The template "
+                "contains a datestring format in between {} signs, e.g. video_{%Y%m%dT%H%M%S}.mp4"
     )
     water_level_fmt = Column(
         String,
-        comment="Filename template (including path) defining the file name convention of files containing water levels. The template contains a datestring format in between {} signs, e.g. /home/orc/water_level/wl_{%Y%m%d}.txt"
+        comment="Filename template (excluding path) defining the file name convention of files containing water "
+                "levels. The template contains a datestring format in between {} signs, "
+                "e.g. wl_{%Y%m%d}.txt. Water level files are written to <nodeorc home folder>/water_level/"
     )
     water_level_datetimefmt = Column(
         String,
@@ -143,13 +153,15 @@ class Settings(Base):
         Float,
         default=3600,
         nullable=False,
-        comment="Float indicating the maximum difference in time allowed between a videofile time stamp and a water level time stamp to match them"
+        comment="Float indicating the maximum difference in time allowed between a videofile time stamp and a water "
+                "level time stamp to match them"
     )
     shutdown_after_task = Column(
         Boolean,
         default=False,
         nullable=False,
-        comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling scheme is implemented and is meant to save power only."
+        comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling "
+                "scheme is implemented and is meant to save power only."
     )
 
     def __str__(self):
@@ -159,7 +171,7 @@ class Settings(Base):
         return "{}".format(self.__str__())
 
 
-class DiskManagement(Base):
+class DiskManagement(BaseConfig):
     __tablename__ = 'disk_management'
 
     id = Column(Integer, primary_key=True)
@@ -192,7 +204,8 @@ class DiskManagement(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-class CallbackUrl(Base):
+
+class CallbackUrl(BaseConfig):
     __tablename__ = 'callback_url'
 
     id = Column(Integer, primary_key=True)
@@ -230,7 +243,7 @@ class CallbackUrl(Base):
         return "{}".format(self.__str__())
 
 
-class Storage(Base):
+class Storage(BaseConfig):
     __tablename__ = "storage"
 
     id = Column(Integer, primary_key=True)
@@ -252,7 +265,7 @@ class Storage(Base):
         return "{}".format(self.__str__())
 
 
-class ActiveConfig(Base):
+class ActiveConfig(BaseConfig):
     __tablename__ = "active_config"
     id = Column(Integer, primary_key=True)
     settings_id = Column(Integer, ForeignKey("settings.id"), nullable=False, comment="general settings of local paths, formats and device behaviour.")
@@ -281,7 +294,19 @@ class ActiveConfig(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-class Callback(Base):
+
+class TaskForm(BaseConfig):
+    __tablename__ = "task_form"
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True
+    )
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
+    task_body = Column(JSON)
+    message = Column(String, nullable=True)  # error message if any
+
+
+class Callback(BaseData):
     __tablename__ = "callback"
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -298,14 +323,4 @@ class Callback(Base):
         body = json.loads(self.body)
         return models.Callback(**body)
 
-
-class TaskForm(Base):
-    __tablename__ = "task_form"
-    id: Mapped[uuid.UUID] = mapped_column(
-        primary_key=True
-    )
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
-    task_body = Column(JSON)
-    message = Column(String, nullable=True)  # error message if any
 

@@ -68,7 +68,11 @@ def add_filehandler(logger, path, log_level=20, fmt=FMT):
     else:
         logger.debug(f"Writing log messages to new file {path}.")
 
-def start_logger(verbose, quiet):
+
+def start_logger(verbose, quiet, log_path=None):
+    if not log_path:
+        # set it here to a fixed location
+        log_path = os.path.join(__home__, "log")
     if verbose:
         verbose = 2
     else:
@@ -79,8 +83,7 @@ def start_logger(verbose, quiet):
         quiet = 0
     logfile = os.path.abspath(
         os.path.join(
-            __home__,
-            "log",
+            log_path,
             datestr,
             f"nodeorc_{timestr}.log"
         )

@@ -1,6 +1,7 @@
 from .models import LocalConfig, RemoteConfig
 import json
 from . import db
+
 import sqlalchemy
 
 def add_config(
@@ -80,7 +81,7 @@ def add_replace_active_config(
         session.add(active_config_record)
     else:
         # active config already exists, replace config
-        active_config_record = get_active_config(session)
+        active_config_record = get_active_config()
         if settings_record:
             active_config_record.settings = settings_record
             # active_config_record.settings_id = settings_record.id
@@ -93,6 +94,7 @@ def add_replace_active_config(
         # session.add(active_config_record)
     session.commit()
     return active_config_record
+
 
 def get_settings(session, id):
     """
@@ -109,10 +111,11 @@ def get_settings(session, id):
     """
     return session.query(db.models.Settings).get(id)
 
-def get_active_config(session, parse=False):
-    active_configs = session.query(db.models.ActiveConfig)
-    assert(len(active_configs.all()) == 1),\
-        'You do not yet have an active configuration. Upload an activate configuration through the CLI. Type "nodeorc upload-config --help" for more information'
+
+def get_active_config(parse=False):
+    active_configs = db.session.query(db.models.ActiveConfig)
+    if len(active_configs.all()) == 0:
+        return None
     active_config = active_configs.first()
     if parse:
         # parse into a Config object (TODO, also add RemoteConfig options)
@@ -153,6 +156,7 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
         task_form = task_form.task_body
     return task_form
 
+
 def patch_active_config_to_accepted():
     """If active config is still CANDIDATE, upgrade to ACCEPTED """
     task_form_row = get_active_task_form(db.session)
@@ -169,3 +173,8 @@ def patch_active_config_to_accepted():
         db.session.commit()
 
 
+def get_data_folder():
+    config = get_active_config(parse=False)
+    if config:
+        return config.disk_management.home_folder
+    return None

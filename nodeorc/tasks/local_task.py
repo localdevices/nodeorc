@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from .. import models, disk_management, db, config
+from .. import models, disk_mng, db, config
 from . import request_task_form
 
 device = db.session.query(db.models.Device).first()
@@ -28,7 +28,6 @@ class LocalTaskProcessor:
             callback_url: models.CallbackUrl,
             storage: models.Storage,
             settings: models.Settings,
-            temp_path: str,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
@@ -36,17 +35,17 @@ class LocalTaskProcessor:
     ):
         self.task_form_template = task_form_template
         self.settings = settings
-        self.temp_path = temp_path
         self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
-        self.disk_management = disk_management
+        self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
         self.max_workers = max_workers
         self.logger = logger
+        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-        self.logger.info(f'Water levels will be searched for in {self.settings["water_level_fmt"]} using a datetime format "{self.settings["water_level_datetimefmt"]}')
-        self.logger.info(f"Start listening to new videos in folder {self.settings['incoming_path']}")
+        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{self.settings["water_level_datetimefmt"]}')
+        self.logger.info(f"Start listening to new videos in folder {self.disk_management.incoming_path}.")
         self.event = threading.Event()
 
         # Create and start the thread
@@ -77,8 +76,13 @@ class LocalTaskProcessor:
         disk_mng_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
-                file_paths = disk_management.scan_folder(
-                    self.settings["incoming_path"],
+                if not os.path.isdir(self.disk_management.home_folder):
+                    # usually happens when USB drive is removed
+                    self.logger.info(f"Home folder {self.disk_management.home_folder} is not available, probably disk is removed. Reboot to try to find disk.")
+                    os._exit(1)
+
+                file_paths = disk_mng.scan_folder(
+                    self.disk_management.incoming_path,
                     suffix=self.video_file_ext
                 )
                 for file_path in file_paths:
@@ -93,16 +97,16 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
-                if time.time() - disk_mng_t0 > self.disk_management["frequency"]:
+                if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
                     self.logger.info(
-                        f"Checking for disk space exceedance of {self.disk_management['min_free_space']}"
+                        f"Checking for disk space exceedance of {self.disk_management.min_free_space}"
                     )
-                    free_space = disk_management.get_free_space(
-                        self.disk_management["home_folder"]
+                    free_space = disk_mng.get_free_space(
+                        self.disk_management.home_folder
                     )
-                    if free_space < self.disk_management["min_free_space"]:
+                    if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
 
 
@@ -117,45 +121,45 @@ class LocalTaskProcessor:
             GB amount of free space currently available
 
         """
-        ret = disk_management.purge(
+        ret = disk_mng.purge(
             [
                 self.settings["success_path"],
                 self.settings["failed_path"],
             ],
             free_space=free_space,
-            min_free_space=self.disk_management["min_free_space"],
+            min_free_space=self.disk_management.min_free_space,
             logger=self.logger,
-            home=self.disk_management["home_folder"]
+            home=self.disk_management.home_folder
         )
         # if returned is False then continue purging the results path
         if not ret:
             self.logger.warning(f"Space after purging still not enough, purging results folder")
-            ret = disk_management.purge(
+            ret = disk_mng.purge(
                 [
                     self.settings["results_path"]
                 ],
                 free_space=free_space,
-                min_free_space=self.disk_management["min_free_space"],
+                min_free_space=self.disk_management.min_free_space,
                 logger=self.logger,
-                home=self.disk_management["home_folder"]
+                home=self.disk_management.home_folder
             )
         if not ret:
             self.logger.warning(f"Not enough space freed up. Checking for critical space.")
             # final computation of free space
-            free_space = disk_management.get_free_space(
-                self.disk_management["home_folder"],
+            free_space = disk_mng.get_free_space(
+                self.disk_management.home_folder,
             )
-            if free_space < self.disk_management["critical_space"]:
+            if free_space < self.disk_management.critical_space:
                 # shutdown the service to secure the device!
                 self.logger.error(
-                    f"Free space is under critical threshold of {self.disk_management['critical_space']}. Shutting down NodeORC service"
+                    f"Free space is under critical threshold of {self.disk_management.critical_space}. Shutting down NodeORC service"
                 )
                 os.system("/usr/bin/systemctl disable nodeorc")
                 os.system("/usr/bin/systemctl stop nodeorc")
                 sys.exit(1)
             else:
                 self.logger.warning(
-                    f"Free space is {free_space} which is not yet under critical space {self.disk_management['critical_space']}. Please contact your supplier for information.")
+                    f"Free space is {free_space} which is not yet under critical space {self.disk_management.critical_space}. Please contact your supplier for information.")
 
     def process_file(
             self,
@@ -174,7 +178,7 @@ class LocalTaskProcessor:
 
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
-            self.temp_path,
+            self.disk_management.tmp_path,
             str(task_uuid)
         )
         # ensure the tmp path is in place
@@ -201,7 +205,7 @@ class LocalTaskProcessor:
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
             storage = models.Storage(
-                url=str(self.settings["results_path"]),
+                url=str(self.disk_management.results_path),
                 bucket_name=timestamp.strftime("%Y%m%d")
             )
             # move the file to the intended bucket
@@ -214,7 +218,7 @@ class LocalTaskProcessor:
             try:
                 h_a = get_water_level(
                     timestamp,
-                    file_fmt=self.settings["water_level_fmt"],
+                    file_fmt=self.water_level_file_template,
                     datetime_fmt=self.settings["water_level_datetimefmt"],
                     allowed_dt=self.settings["allowed_dt"]
                 )
@@ -239,9 +243,9 @@ class LocalTaskProcessor:
             # process the task
             task.execute(task_path)
             # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if self.settings["success_path"]:
+            if self.disk_management.success_path:
                 dst_path = os.path.join(
-                    self.settings["success_path"],
+                    self.disk_management.success_path,
                     timestamp.strftime("%Y%m%d")
                 )
             # video is success, if task form is still CANDIDATE, upgrade to ACCEPTED
@@ -257,9 +261,9 @@ class LocalTaskProcessor:
             self.logger.error(message)
             # find back the file and place in the failed location, organised per day
             if timestamp:
-                dst_path = os.path.join(self.settings["failed_path"], timestamp.strftime("%Y%m%d"))
+                dst_path = os.path.join(self.disk_management.failed_path, timestamp.strftime("%Y%m%d"))
             else:
-                dst_path = self.settings["failed_path"]
+                dst_path = self.disk_management.failed_path
             # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
             task_form_template = config.get_active_task_form(db.session, parse=False)
 
@@ -329,7 +333,8 @@ class LocalTaskProcessor:
         return success
 
     def _post_old_callbacks(self):
-        callback_records = db.session.query(db.models.Callback)
+        session_data = db.init_basedata.get_data_session()
+        callback_records = session_data.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
         success = True
@@ -350,8 +355,8 @@ class LocalTaskProcessor:
             if not(success):
                 # immediately stop the processing of callbacks
                 break
-            db.session.delete(callback_record)
-            db.session.commit()
+            session_data.delete(callback_record)
+            session_data.commit()
 
 
 def get_timestamp(
@@ -455,8 +460,10 @@ def create_task(
     callbacks = []
     for cb in task_form["callbacks"]:
         # replace/remove time stamp
-        cb.pop("timestamp")
-        cb.pop("storage")
+        if "timestamp" in cb:
+            cb.pop("timestamp")
+        if "storage" in cb:
+            cb.pop("storage")
         if "file" in cb:
             file = cb.pop("file")
             if file:
@@ -473,8 +480,10 @@ def create_task(
         callbacks.append(cb_obj)
 
     # remove instantaneous keys
-    task_form.pop("id")
-    task_form.pop("timestamp")
+    if "id" in task_form:
+        task_form.pop("id")
+    if "timestamp" in task_form:
+        task_form.pop("timestamp")
     # replace input and output files
     for repl_arg in REPLACE_ARGS:
         if repl_arg in task_form:

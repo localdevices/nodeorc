@@ -8,7 +8,6 @@ from .. import callbacks
 from urllib.parse import urljoin
 
 from .. import settings_path
-from ..db import session
 
 
 class Callback(BaseModel):
@@ -122,8 +121,10 @@ class CallbackUrl(BaseModel):
 
         """
         # get the active configuration record
-        import config  # import lazily to avoid circular referencing
-        active_config = config.get_active_config(session)
+        from .. import config  # import lazily to avoid circular referencing
+        from ..db import session  # import lazily to avoid circular referencing
+
+        active_config = config.get_active_config()
         callback_url = active_config.callback_url
         # update the tokens
         callback_url.token_access = self.token_access

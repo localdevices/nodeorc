@@ -13,15 +13,26 @@ from . import db, log, models, config, tasks, settings_path, __version__
 
 
 session = db.session
-logger = log.start_logger(True, False)
+# see if there is an active config, if not logger goes to $HOME/.nodeorc
+active_config = config.get_active_config(parse=True)
+if active_config:
+    log_path = active_config.disk_management.log_path
+else:
+    log_path = None
+logger = log.start_logger(
+    True,
+    False,
+    log_path=log_path
+)
 
 # load env variables. These are not overridden if they are already defined
 load_dotenv()
 
-temp_path = os.getenv("TEMP_PATH", "./tmp")
+# temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 device = session.query(db.models.Device).first()
+
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
@@ -34,6 +45,7 @@ def get_docs_settings():
         docs += " {} : {}\n\n".format(f, attr_doc)
     return docs
 
+
 def load_config(config_fn):
     # define local settings below
     if os.path.isfile(config_fn):
@@ -43,7 +55,8 @@ def load_config(config_fn):
             return settings
         except ValidationError as e:
             raise ValueError(
-                f"Settings file in {os.path.abspath(config_fn)} is not a valid local configuration file. Error: {e}")
+                f"Settings file in {os.path.abspath(config_fn)} contains errors. Error: {e}")
+
 
 def validate_env(env_var):
     if os.getenv(env_var) is None:
@@ -56,6 +69,7 @@ def validate_listen(ctx, param, value):
         validate_env("AMQP_CONNECTION_STRING")
 
     return value
+
 
 def validate_storage(ctx, param, value):
     if value == "local":
@@ -157,17 +171,22 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 @cli.command(short_help="Start main daemon")
 @storage_opt
 @listen_opt
-@task_form_opt
-def start(storage, listen, task_form):
+def start(storage, listen):
     # get the device id
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     if listen == "local" and storage == "remote":
-        raise ValidationError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
+        raise click.UsageError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
                               '"--storage remote").')
     if listen == "local":
         # get the stored configuration
-        active_config = config.get_active_config(session, parse=True)
+        active_config = config.get_active_config(parse=True)
+        if not(active_config):
+            raise click.UsageError('You do not yet have an active configuration. Upload an activate configuration '
+                                  'through the CLI. Type "nodeorc upload-config --help" for more information')
+
+        # initialize the database for storing data
+        session_data = db.init_basedata.get_data_session()
         # read the task form from the configuration
         task_form_template = config.get_active_task_form(session, parse=True)
         callback_url = active_config.callback_url
@@ -196,7 +215,7 @@ def start(storage, listen, task_form):
             task_test = models.Task(**task_form_template)
         except Exception as e:
             logger.error(
-                f"Task file in {os.path.abspath(task_form)} cannot be formed into a valid Task instance. Reason: {str(e)}"
+                f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
             )
             # This only happens with version upgrades. Update the status to BROKEN and report back to platform
             task_form_template = config.get_active_task_form(session, parse=False)
@@ -206,7 +225,6 @@ def start(storage, listen, task_form):
         try:
             processor = tasks.LocalTaskProcessor(
                 task_form_template=task_form_template,
-                temp_path=temp_path,
                 logger=logger,
                 **active_config.model_dump()
             )
