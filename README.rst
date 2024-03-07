@@ -134,6 +134,77 @@ is freshly configured it does not have any tasks to perform yet, and therefore i
 (every 5 minutes) to see if any new task is available. If so, it will download and validate the task, and if the task
 is valid, store it and start using it. Storing of tasks and configurations is done through a local database.
 
+For preparing task forms (i.e. templates for performing tasks on any video coming in) we refer to the LiveORC_
+documentation.
+
+During the setup procedure, you will have identified a location to store any information related to NodeORC.
+After you have set this up, everything, including the database of processed videos, callbacks, the raw videos,
+processed result files (NetCDF data files, JPG images), log files, and so on, will all be stored under that same
+folder. If you have selected USB-drive storage, then the USB drive is *always* mounted under ``/mnt/usb``.
+The subfolder structure under this defined folder is as follows:
+
+.. code-block::
+
+    .
+    ├── nodeorc_data.db     <- database holding records of nodeorc videos and callbacks.
+    ├── log                 <- folder holding log files in subfolders. One subfolder is created per calendar day.
+    ├── results             <- folder holding result files in subfolders. One subfolder is created per calendar day.
+    ├── incoming            <- folder in which new video files are expected. You must configure your camera such that it
+    │                          writes videos in THIS folder, using a specified naming convention with a datetime string.
+    ├── failed              <- if a video fails, then the raw video will be stored here in subfolders. One subfolder is
+    │                          created per calendar day.
+    ├── success             <- if a video is successfully processed it will be stored here in subfolders after
+    │                          processing. One subfolder is created per calendar day.
+    ├── tmp                 <- during processing, a temporary folder will be created here in which the raw video and
+    │                          output files will be stored. Once successful, the tmp content will be moved to
+    │                          results (output) and success (raw video)
+    ├── water_level         <- text or csv files are expected under this folder, holding the water level. The text
+    │                          files can have specific naming conventions that include a datestring so that
+    │                          water levels may be stored in files per day. The format in the files can be
+    │                          defined in a configuration message.
+
+We follow this structure to allow a better understanding of the working methods.
+
+Getting videos into the right folder
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If you have for instance identified the USB-drive as location for storage, then incoming videos must be reported
+in ``/mnt/usb/incoming``. If you for instance have a raspberry pi setup, and you want to make a regular video upon
+booting the device, you may for instance run a script upon boot that looks as follows (make sure your raspi camera
+is switched on and that the necessary libraries are installed). The script can be run e.g. through a cronjob or
+by adding it to your profile.
+
+.. code-block::
+
+    #!/bin/bash
+    # NOTE! THIS CODE HAS NOT BEEN TESTED.
+    # make a datetime string, to identify the utc time of the video
+    export trg_path="/mnt/usb/incoming"
+    export dt=`date '+%Y%m%d_%H%M%S'`
+    filename=${trg_path}/${dt}.h264
+    # record the video
+    raspivid --height 1080 --bitrate 20000000 --timeout 5 --framerate 30 --output ${filename}
+
+For other camera setups, the manner in which you get videos in the right folder may strongly depend on the brand and
+type. Most likely camera-specific settings are needed.
+
+Configuring the file naming convention of videos
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+While you may store videos in the ``incoming`` folder, nodeorc has to be able to extract the exact datetime format
+from the file name. You will need to specify the file naming convention in the configuration of NodeORC. This can
+be configured during the installation process, but you can also alter the video naming convention in the
+LiveOpenRiverCam platform by making a new configuration message for the device.
+
+A typical filename convention may for instance be:
+
+.. code-block::
+
+    ``%Y%m%d_%H%M%S.h264``
+
+
+.. note::
+
+    The reconfiguration from LiveORC has not yet been implemented. This will be a feature in a upcoming release.
+
 
 .. _LiveORC: https://github.com/localdevices/LiveORC
 
