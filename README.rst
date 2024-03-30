@@ -133,10 +133,12 @@ For preparing task forms (i.e. templates for performing tasks on any video comin
 documentation.
 
 During the setup procedure, you will have identified a location to store any information related to NodeORC.
+This is the "home folder" of NodeORC.
 After you have set this up, everything, including the database of processed videos, callbacks, the raw videos,
 processed result files (NetCDF data files, JPG images), log files, and so on, will all be stored under that same
-folder. If you have selected USB-drive storage, then the USB drive is *always* mounted under ``/mnt/usb``.
-The subfolder structure under this defined folder is as follows:
+folder. If you have selected USB-drive storage, then the USB drive is *always* mounted under ``/mnt/usb`` and this
+folder will automatically be configured as the "home folder"
+The subfolder structure under this home folder is as follows:
 
 .. code-block::
 
@@ -182,6 +184,105 @@ by adding it to your profile.
 For other camera setups, the manner in which you get videos in the right folder may strongly depend on the brand and
 type. Most likely camera-specific settings are needed.
 
+Supplying water levels
+^^^^^^^^^^^^^^^^^^^^^^
+At this moment, NodeORC cannot (yet) read water levels optically. This means that some form of water levels must be
+supplied in a text file. We support a simple text file that contains no header, and a space separated set of water
+levels. By default, NodeORC will look for a file called ``all_levels.txt`` in the ``water_level`` folder under your
+supplied home folder. For reconfiguration of this file, we refer to the reconfiguration section written below.
+Within this file, it is expected that water levels are written in a high enough frequency to be able to match
+them against dates and times of incoming videos. The closest date and time found will be used. The format of the content
+of this file is a space-separated .csv file without headers with 2 columns in it: the first column contains a date-time
+string (without spaces). The second column contains the water levels. See for example the series shown below.
+
+.. code-block::
+
+    20221222_000000 92.367
+    20221222_001500 92.367
+    20221222_004500 92.367
+    20221222_010000 92.367
+    20221222_011500 92.368
+    20221222_013000 92.37
+    20221222_014500 92.378
+    20221222_020000 92.384
+    20221222_021500 92.386
+    20221222_024500 92.384
+    20221222_030000 92.378
+    20221222_031500 92.374
+    20221222_033000 92.373
+    20221222_034500 92.373
+    20221222_040000 92.377
+    20221222_041500 92.383
+    20221222_044500 92.389
+    20221222_050000 92.391
+    20221222_051500 92.398
+    20221222_053000 92.419
+    20221222_054500 92.44
+    20221222_060000 92.444
+    20221222_061500 92.444
+    20221222_064500 92.463
+    20221222_070000 92.468
+    20221222_071500 92.473
+    20221222_073000 92.475
+    20221222_074500 92.476
+    20221222_080000 92.481
+    20221222_081500 92.489
+
+TODO COMPLETE
+
+Reconfiguring NodeORC
+=====================
+
+General instructions
+--------------------
+
+If you wish to modify the configuration after you have installed NodeORC, you can currently only do this on the device
+itself. You must login to the device (e.g. headless via SSH or graphically via a VNC connection or Teamviewer
+connection) move to the folder of installation and then execute:
+
+.. code-block:: shell
+
+    $ python nodeorc upload-config <NAME OF JSON-FILE>
+
+Here you should replace <NAME OF JSON-FILE> by a JSON file that contains the relevant details. You can find the
+JSON file with your settings from the setup procedure in the ``settings`` folder under the name ``config_device.json``.
+From here you can modify the settings. In the subsections below you can find instructions for several settings.
+If a settings is not passing through validation, for instance because you use strings where numbers are expected
+(or vice versa) or the format of the JSON-file contains syntax errors, you will receive an error message. Please
+read this carefully before continuing. Below we describe the most important cases for changing the configuration.
+
+  We are working on allowing for changes in configurations within the LiveORC front end. Soon you will also be able
+  to reconfigure remotely using the LiveORC web platform. Please stay posted.
+
+
+Configuring the file locations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+During the setup, you have identified a logical file path under which incoming videos, results, and water levels are
+stored. If you have opted for use of a USB-drive, then this location is always ``/mnt/usb``.
+
+Configuring the home folder
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The home folder is the folder in which all incoming videos are stored, where results of video analyses are stored,
+where the database with callbacks is stored, and where videos that have been successful or not are stored. These
+different files are all located in different subfolders, as shown above with the example for the home folder being
+``/mnt/usb``. If you wish to alter the home folder location then you can do this by modifying the ``home_folder``
+in the subsection ``disk_management``. For instance, if you have an edge device with an SSD drive you could use your
+user-home folder and point it to ``/home/user/nodeorc_data``. We here assume that ``user`` is the username of the
+current device.
+
+This would look as follows in the JSON-configuration file.
+
+.. code-block::
+
+    {
+       ...
+        "disk_management": {
+            "home_folder": "/home/user/nodeorc_data",
+            ...
+        }
+    }
+
 Configuring the file naming convention of videos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 While you may store videos in the ``incoming`` folder, nodeorc has to be able to extract the exact datetime format
@@ -189,14 +290,45 @@ from the file name. You will need to specify the file naming convention in the c
 be configured during the installation process, but you can also alter the video naming convention in the
 LiveOpenRiverCam platform by making a new configuration message for the device.
 
-A typical filename convention (taken from our raspberry camera example) may for instance be:
+A typical file (taken from our raspberry camera example) may for instance be:
 
 .. code-block::
 
-    %Y%m%d_%H%M%S.h264
+    20240229_100003.h264
 
+Where year (2024), month (02), day (29), hour (10), minute (00) and second (03) are supplied as datestring.
+You can instruct NodeORC to parse the date and time following a datetime template. In this example, the template
+would be
 
-    The reconfiguration from LiveORC has not yet been implemented. This will be a feature in a upcoming release.
+.. code-block::
+
+    {%Y%m%d_%H%M%S}.h264
+
+Here ``%Y`` means the 4-digit year, ``%m`` is the 2-digit month, ``%d`` is the 2-digit day in the month, ``%H`` the
+2-digit hour, ``%M`` the 2-digit minute and ``%S`` the 2-digit second. NodeORC will try to parse a date using the
+string template between the curly braces (i.e. ``{`` and ``}``). The assumed time is always UTC!!! This is crucial
+in order to ensure that there is never a timezone issue between the platform on which videos are read and treated
+(NodeORC) and the platform where results are stored, displayed and redistributed (LiveORC).
+
+This file naming convention can be configured by altering the field ``video_file_fmt`` under the ``settings`` section in
+the JSON file.
+
+.. code-block::
+
+    {
+       ...
+        "settings": {
+            ...,
+            "video_file_fmt": "{%Y%m%d_%H%M%S}.h264",
+            ...
+        }
+    }
+
+The above example would configure the file naming convention as shown in the example.
+
+  Don't forget to place commas between each field inside a JSON section, and no comma after the last field of a section.
+  Also don't forget to open a section with a curly brace ``{`` and close it with a curly brace ``}``.
+
 
 
 .. _LiveORC: https://github.com/localdevices/LiveORC
