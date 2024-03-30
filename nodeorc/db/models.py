@@ -11,7 +11,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 
 from .. import models
-
+from .. import __version__
 
 class TaskFormStatus(enum.Enum):
     NEW = 1  # task form that does not pass through validation
@@ -78,6 +78,11 @@ class Device(BaseConfig):
     )
     status = Column(Enum(DeviceStatus), default=DeviceStatus.HEALTHY)
     form_status = Column(Enum(DeviceFormStatus), default=DeviceFormStatus.NOFORM)
+    nodeorc_version = Column(
+        String,
+        default=__version__,
+        nullable=False
+    )
     message = Column(String, nullable=True)  # error message if any
 
     def __str__(self):
@@ -96,6 +101,7 @@ class Device(BaseConfig):
         device_info["id"] = str(self.id)
         device_info["status"] = self.status.value
         device_info["form_status"] = self.form_status.value
+        device_info["nodeorc_version"] = self.nodeorc_version.value
 
         return device_info
 
@@ -163,6 +169,7 @@ class Settings(BaseConfig):
         comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling "
                 "scheme is implemented and is meant to save power only."
     )
+
 
     def __str__(self):
         return "Settings {} ({})".format(self.created_at, self.id)
