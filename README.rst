@@ -228,7 +228,69 @@ string (without spaces). The second column contains the water levels. See for ex
     20221222_080000 92.481
     20221222_081500 92.489
 
-TODO COMPLETE
+For operational observations, it is important that you ensure that the
+above-mentioned file is produced and kept up to date constantly with newly observed
+water levels. You can reconfigure the file to a file template that uses a
+datetime string to identify this file. With this you can create one file per
+day, or per month, so that files do not become too large and in case a file becomes
+corrupt (unlikely but not impossible), processing will pick up in the next day.
+Ideally, ensure that the frequency of water level observations is at
+least as high as the frequency of video observations. Because the collection of water
+levels is specific for each sensor or application, there is no general method in
+NodeORC to do the collection of water levels. Please create your own scripts to do
+this. Below we provide two approaches how you could do this.
+
+* Harvest water levels from an API: if water levels are posted on a central platform
+  such as a Delft-FEWS forecasting system or a general web-based API, you can write a
+  script that runs as a cronjob in the NodeORC device. Below a pseudo-code example of a
+  script that would harvest the last water level from some API. Note that this is not a
+  real example. You have to adapt this to the specific API that you are using.
+
+  .. code-block:: python
+
+    import os
+    import requests
+    from urllib import urljoin
+    from datetime import datetime
+    # first we determine in which file the water level will be written. We assume
+    # that we create one file per day. This is highly recommended so that, in case
+    # for some reason a file becomes corrupted, the next day you will be able to
+    # continue processing without problems.
+    water_level_path = "/mnt/usb/water_level"
+    today = datetime.utcnow().strftime("%Y%m%d")
+    filename = os.path.join(
+        water_level_path,
+        f"water_level_{today}.txt"
+    )
+    # let's assume that time series for water levels are stored under a site id and
+    # a certain variable
+    headers = {}  # you may need to fill up headers to allow access with e.g. a token
+    # here we leave this empty for now. Review your specific API docs for further info
+    site_id = 1
+    variable = "water_level"
+    api_url = "https://api.somewhere-on-the-web.com"
+    # we assume that there is a specific end point for the last time step. Review
+    # your API documentation to come up with the right url
+    end_point = f"site/{site_id}/time_series/{variable}/last_time_step"
+    # the full url to the water level data
+    url = urljoin(api_url, end_point)
+    # now make the request!
+    r = requests.get(url, headers=headers)
+    if r.status != 200:
+        raise ValueError(f"successful response status (200) was not given, instead we got {r.status}")
+    # the json payload of the response contains the
+    data = r.json()
+    time = datetime.strptime(data["datetime"], "%Y%m%dT%H:%M:%S")
+    water_level = data["value"]
+    # now write the value to the right file
+    new_line = f"{time.strftime('%Y%m%d_%H%M%S')} {water_level}\n"  # don't forget a carriage return at the end!
+    with open(filename, "a") as f:
+        f.write(new_line)
+    # DONE!
+
+* Get a water level posted in the file from a sensor on the site directly. This would
+  require a sensor specific approach to read the sensor from your on-site compute
+  device directly.
 
 Reconfiguring NodeORC
 =====================
