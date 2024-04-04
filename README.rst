@@ -7,12 +7,6 @@ NodeOpenRiverCam
 |pypi| |piwheels| |docs_latest| |license|
 
 
-    Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for
-    their first release. The first release of both OpenRiverCam components is planned
-    in May 2024. Until that time please stay up to date on this page. The
-    documentation will change significantly during this period. We do not provide any
-    feedback on questions until the first release is out.
-
 
 What is NodeOpenRiverCam
 ========================
@@ -24,6 +18,15 @@ can connect as many NodeOpenRiverCam devices to a LiveOpenRiverCam server as you
 
 NodeOpenRiverCam is being developed in the TEMBO Africa project. The TEMBO Africa project has received funding from the
 European Union's Horizon Europe research and innovation programme under greant agreement No. 101086209.
+
+
+    Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for
+    their first release. The first release of both OpenRiverCam components is planned
+    in May 2024. Until that time please stay up to date on this page. The
+    documentation will change significantly during this period. We do not provide any
+    feedback on questions until the first release is out.
+
+.
 
 .. figure:: docs/static/front.jpg
     :height: 600px
