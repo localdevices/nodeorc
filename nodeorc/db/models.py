@@ -36,11 +36,12 @@ class DeviceFormStatus(enum.Enum):
     BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
 
 
-# database components for configuration, remains static during most of the time, unless an update needs to be processed
+# database components for configuration, remains static during most of the time, unless
+# an update needs to be processed.
 BaseConfig = declarative_base()
 
-# database components for storing incremental data, records are added with each video and callback, but database can
-# safely be removed, e.g. when disk is full
+# database components for storing incremental data, records are added with each video
+# and callback, but database can safely be removed, e.g. when disk is full.
 BaseData = declarative_base()
 
 

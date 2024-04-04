@@ -7,10 +7,12 @@ NodeOpenRiverCam
 |pypi| |piwheels| |docs_latest| |license|
 
 
-  Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for their first release. The first
-  release of both OpenRiverCam components is planned in May 2024. Until that time please stay up to date on this
-  page. The documentation will change significantly during this period. We do not provide any feedback on questions
-  until the first release is out.
+    Both NodeOpenRiverCam and LiveOpenRiverCam are currently under development for
+    their first release. The first release of both OpenRiverCam components is planned
+    in May 2024. Until that time please stay up to date on this page. The
+    documentation will change significantly during this period. We do not provide any
+    feedback on questions until the first release is out.
+
 
 What is NodeOpenRiverCam
 ========================
@@ -28,6 +30,12 @@ European Union's Horizon Europe research and innovation programme under greant a
 
     NodeOpenRiverCam site with processing occurring on the fly, and data sent to the LiveOpenRiverCam platform.
     Credits SEBA and Photrack for site setup and the hardware.
+
+Issues
+======
+
+If you have a question or problem, then please DO NOT send emails to us. Instead,
+please submit an issue on the Github respository, following the guidelines.
 
 Getting started
 ===============
@@ -56,7 +64,9 @@ Installation
 ============
 
 To install the latest release of NodeOpenRiverCam on your device, there are two options, native installation (only
-on linux devices) or a docker installation (also on Windows or Mac):
+on linux devices, tested for debian-based systems) or a docker installation (also on
+Windows
+or Mac):
 
 Native installation
 -------------------
@@ -83,8 +93,13 @@ are outlined below:
 
 The setup procedure will ask several inputs including the url and your username and password for the LiveOpenRiverCam
 server. Note that these credentials will not be stored on the device, but only used to receive a temporary access token
-and refresh token. If you use a local LiveOpenRiverCam instance, then this will report on https://127.0.0.1:8000
-Please use this URL and ensure that the local LiveOpenRiverCam instance is running on your computer in the same network.
+and refresh token. If you use a local LiveOpenRiverCam instance, then this will
+report on its local IP-address and hostname. For instance if the IP-address is 192
+.168.1.107, and hostname is ``mynodeorc` then you can access the server while on the
+same network on http://192.168.1.107:8000 or (more easy as hostnames do not change)
+http://mynodeorc:8000
+Please use this URL and ensure that the local LiveOpenRiverCam instance is running on
+your computer in the same network.
 
 You can also perform installation steps one-by-one. If you wish to see the options of the setup script, then simply
 use:
@@ -103,7 +118,7 @@ still to be determined):
 
 .. code-block:: shell
 
-    docker pull localdevice/nodeorc
+    docker pull localdevices/nodeorc
 
 We will ensure that you can also use the setup script for a docker installation, so that you can supply the required
 information for setup in a similar way as a native installation.
@@ -183,6 +198,30 @@ by adding it to your profile.
 
 For other camera setups, the manner in which you get videos in the right folder may strongly depend on the brand and
 type. Most likely camera-specific settings are needed.
+
+As soon as a file is appearing in the incoming folder, nodeorc will capture this and
+add that file in the queue. If currently nothing is being processed, nodeorc will
+immediately start processing it. If an earlier file is being processed the new file
+is queued up until the previous video is done.
+
+
+Failed and success folder
+^^^^^^^^^^^^^^^^^^^^^^^^^
+These two folders will contain videos that are already processed. If a video resulted
+in a failure (e.g. because no water level was found, the video is corrupt, or the
+processing recipe for some reason failed), then the video will be removed to the
+failed folder. If the video was processed with success, then the video is moved to
+the success folder. In case the video was successfully processed but the callback to
+the LiveORC server failed (e.g. because there was no network, or data bundle is
+finished) then the video is moved to "success" and callbacks that failed will be
+stored in the database and sent at a later stage. Failed and success videos are
+stored in subfolders per day with a YYYYMMDD format for the folder names.
+
+Results folder
+^^^^^^^^^^^^^^
+The results folder will contain outputs (figures and netcdf files) for each video.
+These outputs are organized in folder per day with a YYYYMMDD format for the folder
+name.
 
 Supplying water levels
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -292,6 +331,20 @@ this. Below we provide two approaches how you could do this.
   require a sensor specific approach to read the sensor from your on-site compute
   device directly.
 
+Cleaning up disk of home folder
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To prevent that storage fills up until the device is entirely full, there are several
+configuration options to control how storage is managed. If storage reaches a certain
+low threshold, then files in the failed and success folder are cleaned up until there
+is sufficient drive space, starting with the oldest files first. If that is not
+sufficient, then results files will also be removed. If for
+some reason the space goes down further, then nodeorc will shut itself down to ensure
+that the compute device can still be accessed remotely. In the
+:ref:`configuration <config>` section you will find that you can alter the
+thresholds, which default to 2GB and 1GB respectively.
+
+
 Reconfiguring NodeORC
 =====================
 
@@ -315,7 +368,6 @@ read this carefully before continuing. Below we describe the most important case
 
   We are working on allowing for changes in configurations within the LiveORC front end. Soon you will also be able
   to reconfigure remotely using the LiveORC web platform. Please stay posted.
-
 
 Configuring the file locations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -345,6 +397,18 @@ This would look as follows in the JSON-configuration file.
         }
     }
 
+Disk management
+^^^^^^^^^^^^^^^
+Other options in the disk management section are meant to control the amount of
+available disk space on the device. ``min_free_space`` gives the minimum amount of
+space (GB) on the drive that contains the ``home_folder`` that should be kept free.
+``critical_space`` is the amount of space under which NodeORC will shutdown its own
+service. This is meant to ensure the device can still operate and can still be
+accessed remotely. This is not possible when disk space reaches zero. ``frequency``
+is the amount of seconds interval after which disk space will be checked and possible
+cleanup actions initiated.
+
+
 Configuring the file naming convention of videos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 While you may store videos in the ``incoming`` folder, nodeorc has to be able to extract the exact datetime format
@@ -352,15 +416,15 @@ from the file name. You will need to specify the file naming convention in the c
 be configured during the installation process, but you can also alter the video naming convention in the
 LiveOpenRiverCam platform by making a new configuration message for the device.
 
-A typical file (taken from our raspberry camera example) may for instance be:
+A typical file (taken from our raspberry pi camera example) may for instance be:
 
 .. code-block::
 
     20240229_100003.h264
 
-Where year (2024), month (02), day (29), hour (10), minute (00) and second (03) are supplied as datestring.
-You can instruct NodeORC to parse the date and time following a datetime template. In this example, the template
-would be
+Where year (2024), month (02), day (29), hour (10), minute (00) and second (03) are
+supplied as datetime string. You can instruct NodeORC to parse the date and time
+following a datetime template. In this example, the template would be:
 
 .. code-block::
 
@@ -391,6 +455,67 @@ The above example would configure the file naming convention as shown in the exa
   Don't forget to place commas between each field inside a JSON section, and no comma after the last field of a section.
   Also don't forget to open a section with a curly brace ``{`` and close it with a curly brace ``}``.
 
+Change the callback url details
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+During setup, you will have configured the LiveORC on which the device will report
+and checks in for reconfiguration. You may alter this by changing the following
+settings:
+* ``url``: the main url to the LiveORC server
+* ``token_refresh_end_point``: normally you should never change this, unless in a
+  later moment in time the name of this end point changes in the LiveORC code.
+* ``token_refresh``: the refresh token, used to refresh your access token when it has
+  expired.
+* ``token_access``: the access token for LiveORC. Note that this token is replaced
+  automatically after 6 hours by a new token using the ``token_refresh``. When the
+  refresh token is used, it also automatically expires and gets replaced by a new
+  refresh token.
+
+{
+    "callback_url": {
+        "url": "http://127.0.0.1:8000",
+        "token_refresh_end_point": "/api/token/refresh/",
+        "token_refresh": "",
+        "token_access": ""
+    }
+
+Water level file naming format and datetime format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+    "settings": {
+        ...,
+        "water_level_fmt": "wlevel_{%Y%m%d}.txt",
+        "water_level_datetimefmt": "%Y%m%d_%H%M%S",
+        "allowed_dt": 3600
+        ...
+    },
+
+Reboot and shutdown options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are two options that control reboots and shutdowns. ``shutdown_after_task``
+ensures that the device shuts down once there are no further videos to process in the
+queue. This option should ONLY be used when the device is controlled by a power
+cycling scheme, which ensures that after a certain amount of time the device will
+switch back on. Power cycling arrangements are device-specific and therefore not
+supported in NodeORC. You need to make your own hardware controller or scripts to do
+this.
+
+``reboot_after`` can be used to reboot a device after a certain time interval. If you
+set the value to an amount of seconds above 0, the device will reboot after the set
+amount in seconds. A minimum of 3600 seconds is used. If the device is still
+processing a video when the time interval is reached, the video will first finish
+processing before rebooting. The default value is 86400 (i.e. one day).
+
+.. code-block:: json
+
+    "settings": {
+        "shutdown_after_task": false,
+        "reboot_after": 86400
+
+    },
 
 
 .. _LiveORC: https://github.com/localdevices/LiveORC
