@@ -14,8 +14,9 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from .. import models, disk_mng, db, config
+from .. import models, disk_mng, db, config, utils
 from . import request_task_form
+
 
 device = db.session.query(db.models.Device).first()
 
@@ -86,7 +87,11 @@ class LocalTaskProcessor:
                     suffix=self.video_file_ext
                 )
                 for file_path in file_paths:
-                    if os.path.isfile(file_path) and file_path not in self.processed_files:
+                    # each file is checked if it is not yet in the queue and not
+                    # being written into
+                    if os.path.isfile(file_path) and \
+                            file_path not in self.processed_files and \
+                            utils.is_file_size_changing_and_not(file_path):
                         self.logger.info(f"Found file: {file_path}")
                         # Submit the file processing task to the thread pool
                         executor.submit(
