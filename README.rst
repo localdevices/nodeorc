@@ -95,7 +95,7 @@ The setup procedure will ask several inputs including the url and your username 
 server. Note that these credentials will not be stored on the device, but only used to receive a temporary access token
 and refresh token. If you use a local LiveOpenRiverCam instance, then this will
 report on its local IP-address and hostname. For instance if the IP-address is 192
-.168.1.107, and hostname is ``mynodeorc` then you can access the server while on the
+.168.1.107, and hostname is ``mynodeorc`` then you can access the server while on the
 same network on http://192.168.1.107:8000 or (more easy as hostnames do not change)
 http://mynodeorc:8000
 Please use this URL and ensure that the local LiveOpenRiverCam instance is running on
