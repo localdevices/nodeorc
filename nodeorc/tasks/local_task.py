@@ -75,11 +75,16 @@ class LocalTaskProcessor:
         )
         # start the timer for the disk manager
         disk_mng_t0 = time.time()
+        reboot_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
                 if not os.path.isdir(self.disk_management.home_folder):
                     # usually happens when USB drive is removed
-                    self.logger.info(f"Home folder {self.disk_management.home_folder} is not available, probably disk is removed. Reboot to try to find disk.")
+                    self.logger.info(
+                        f"Home folder {self.disk_management.home_folder} is not "
+                        f"available, probably disk is removed. Reboot to try to find "
+                        f"disk. "
+                    )
                     os._exit(1)
 
                 file_paths = disk_mng.scan_folder(
@@ -102,6 +107,8 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
+                if time.time() - reboot_t0 > self.settings.reboot_after():
+                    utils.reboot_now()
                 if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
@@ -113,6 +120,7 @@ class LocalTaskProcessor:
                     )
                     if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
+
 
 
     def cleanup_space(self, free_space):

@@ -97,3 +97,7 @@ def is_file_size_changing(fn, delay=1):
         return True
     else:
         return False
+
+
+def reboot_now():
+    os.system("/sbin/reboot -h now")
