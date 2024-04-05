@@ -59,6 +59,24 @@ jobs:
           python -m pip install dist/nodeorc*.whl
           nodeorc --version
 
+  upload-setup:
+    needs: test-built-dist
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v3
+      - name: List contents of src code
+        run: ls -ltrh
+      - name: Upload setup bash script to release
+        uses: svenstaro/upload-release-action@2.5.0
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          file: setup.sh
+          overwrite: false
+
   upload-to-test-pypi:
     needs: test-built-dist
     if: github.event_name == 'push'
