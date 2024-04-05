@@ -33,32 +33,32 @@ jobs:
           name: releases
           path: dist
 
-  # test-built-dist:
-  #   needs: build-artifacts
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash -l {0}
-  #   steps:
-  #     - uses: actions/checkout@v3
+  test-built-dist:
+    needs: build-artifacts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - uses: actions/download-artifact@v3
-  #       with:
-  #         name: releases
-  #         path: dist
-  #     - name: List contents of built dist
-  #       run: |
-  #         ls -ltrh
-  #         ls -ltrh dist
+      - uses: actions/download-artifact@v3
+        with:
+          name: releases
+          path: dist
+      - name: List contents of built dist
+        run: |
+          ls -ltrh
+          ls -ltrh dist
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.10'
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-  #     - name: Verify the built dist/wheel is valid
-  #       run: |
-  #         python -m pip install dist/hydromt*.whl
-  #         hydromt --models
+      - name: Verify the built dist/wheel is valid
+        run: |
+          python -m pip install dist/nodeorc*.whl
+          nodeorc --version
 
   # upload-to-test-pypi:
   #   needs: test-built-dist
