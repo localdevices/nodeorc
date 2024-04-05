@@ -26,10 +26,8 @@ jobs:
       - name: generate env
         run: |
           pip install tomli flit twine
-
       - name: Build artifacts
-        run: make pypi
-
+        run: flit build
       - uses: actions/upload-artifact@v3
         with:
           name: releases
