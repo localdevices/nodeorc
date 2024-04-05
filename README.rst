@@ -28,7 +28,7 @@ European Union's Horizon Europe research and innovation programme under greant a
 
 .
 
-.. figure:: docs/static/front.jpg
+.. figure:: https://raw.githubusercontent.com/localdevices/nodeorc/main/docs/static/front.jpg
     :height: 600px
 
     NodeOpenRiverCam site with processing occurring on the fly, and data sent to the LiveOpenRiverCam platform.
