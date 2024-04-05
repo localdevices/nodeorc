@@ -1,4 +1,7 @@
 #idea
+settings/*
+!settings/config_template.json
+
 
 .idea
 # Byte-compiled / optimized / DLL files
