@@ -40,8 +40,10 @@ class LocalTaskProcessor:
         self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
-        self.max_workers = max_workers
+        self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
+        self.processing = False  # state for checking if any processing is going on
+        self.reboot = False  # state that checks if a scheduled reboot should be done
         self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
@@ -107,8 +109,10 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
+                # do housekeeping, reboots, disk management
                 if time.time() - reboot_t0 > self.settings.reboot_after():
-                    utils.reboot_now()
+                    self.reboot = True
+                self.reboot_now()
                 if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
@@ -178,6 +182,7 @@ class LocalTaskProcessor:
             self,
             file_path,
     ):
+
         # before any processing, check for new task forms online
         new_task_form_row = request_task_form(
             session=db.session,
@@ -197,6 +202,8 @@ class LocalTaskProcessor:
         # ensure the tmp path is in place
         if not(os.path.isdir(task_path)):
             os.makedirs(task_path)
+        # now we really start processing
+        self.processing = True
         try:
             url, filename = os.path.split(file_path)
             cur_path = file_path
@@ -286,6 +293,10 @@ class LocalTaskProcessor:
         self.processed_files.remove(file_path)
         # if callbacks were successful, try to send off old callbacks that were not successful earlier
         self._post_old_callbacks()
+        # processing done, so set back to False
+        self.processing = False
+        # check if any reboots are needed
+        self.reboot_now()
         # shutdown if configured to shutdown after task
         self._shutdown_or_not()
 
@@ -345,7 +356,21 @@ class LocalTaskProcessor:
 
         return success
 
+    def reboot_now(self):
+        """
+        Check for reboot requirement and reboot if nothing is being processed
+        """
+        if self.reboot:
+            # check if any processing is happening, if not, then reboot, else wait
+            if not self.processing:
+                utils.reboot_now()
+
+
     def _post_old_callbacks(self):
+        """
+        Try to post remaining non-posted callbacks and change their states in database
+        if successful
+        """
         session_data = db.init_basedata.get_data_session()
         callback_records = session_data.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
@@ -377,6 +402,24 @@ def get_timestamp(
     parse_from_fn,
     fn_fmt,
 ):
+    """
+    Find time stamp from file name using expected file name template with datetime fmt
+
+    Parameters
+    ----------
+    fn : str
+        filename path
+    parse_from_fn : bool
+        If set to True, filename is used to parse timestamp using a filename template,
+        if False, timestamp is retrieved from the last change datetime of the file
+    fn_fmt : filename template with datetime format between {}
+
+    Returns
+    -------
+    datetime
+        timestamp of video file
+
+    """
     if parse_from_fn:
         datetime_fmt = fn_fmt.split("{")[1].split("}")[0]
         fn_template = fn_fmt.replace(datetime_fmt, "")
@@ -399,6 +442,22 @@ def get_timestamp(
 
 
 def read_water_level_file(fn, fmt):
+    """
+    Parse water level file using supplied datetime format
+
+    Parameters
+    ----------
+    fn : str
+        water level file
+    fmt : str
+        datetime format
+
+    Returns
+    -------
+    pd.DataFrame
+        content of water level file
+
+    """
     date_parser = lambda x: datetime.datetime.strptime(x, fmt)
     df = pd.read_csv(
         fn,
@@ -418,8 +477,26 @@ def get_water_level(
     file_fmt,
     datetime_fmt,
     allowed_dt=None,
-
 ):
+    """
+    Get water level from file(s)
+
+    Parameters
+    ----------
+    timestamp : datetime
+        timestamp to seek in water level file(s)
+    file_fmt : str
+        water level file template with possible datetime format in between {}
+    datetime_fmt : str
+        datetime format used inside water level files
+    allowed_dt : float
+        maximum difference between closest water level and video timestamp
+
+    Returns
+    -------
+    float
+        water level
+    """
     if "{" in file_fmt and "}" in file_fmt:
         datetimefmt = file_fmt.split("{")[1].split("}")[0]
         water_level_template = file_fmt.replace(datetimefmt, ":s")
@@ -454,6 +531,33 @@ def create_task(
     h_a,
     logger=logging
 ):
+    """
+    Create task for specific video file from generic task form
+
+    Parameters
+    ----------
+    task_form_template : dict
+        task form with specifics to be filled in
+    task_uuid : uuid
+        unique task id
+    task_path : str
+        path to temporary location where task is conducted
+    storage : permanent storage for results
+    filename : str
+        name of video file
+    timestamp : datetime
+        timestamp of video
+    h_a : float
+        actual water level during video
+    logger : logging
+        logger object
+
+    Returns
+    -------
+    Task
+        specific task for video
+
+    """
     task_form = copy.deepcopy(task_form_template)
     # prepare input_files field in task definition
     input_files = {

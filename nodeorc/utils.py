@@ -100,4 +100,4 @@ def is_file_size_changing(fn, delay=1):
 
 
 def reboot_now():
-    os.system("/sbin/reboot -h now")
+    os.system("/sbin/shutdown -r now")
