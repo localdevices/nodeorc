@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 requires-python =">=3.9"
-readme = "README.md"
+readme = "README.rst"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
