@@ -33,8 +33,9 @@ class Callback(BaseModel):
 
     def to_db(self):
         from .. import db  # import lazily to prevent circular imports
+        session_data = db.init_basedata.get_data_session()
         rec = db.models.Callback(
             body=self.model_dump_json()
         )
-        db.session.add(rec)
-        db.session.commit()
+        session_data.add(rec)
+        session_data.commit()

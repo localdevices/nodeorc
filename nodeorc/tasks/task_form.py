@@ -5,18 +5,20 @@ import logging
 import os
 import requests
 import time
+import traceback
+
 from urllib.parse import urljoin
 import uuid
 import json
 
 from ..models import Task
 from ..db.models import TaskForm, TaskFormStatus, DeviceFormStatus
-from .. import __home__
+from .. import utils, __home__
 
 config_file = os.path.join(__home__, "task_form.json")
 
 
-def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging):
+def wait_for_task_form(session, callback_url, device, timeout=300, reboot_after=0., logger=logging):
     """
     Keep looking for a task form for the device, remotely and locally. When found, the service will shutdown
     and auto-reboot if running as service.
@@ -33,7 +35,7 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
         logger of nodeorc
 
     """
-
+    reboot_t0 = time.time()
     while True:
         # keep on trying to get a new task form from configured server until successful
         task_form = request_task_form(session, callback_url, device, logger=logger)
@@ -44,7 +46,9 @@ def wait_for_task_form(session, callback_url, device, timeout=5, logger=logging)
             # new task form found, reboot service
             logger.info("New task form setup. Reboot service...")
             os._exit(0)
-
+        if time.time() - reboot_t0 > reboot_after:
+            logger.info(f"Rebooting device after {reboot_after} seconds")
+            utils.reboot_now()
         time.sleep(timeout)
 
 def request_task_form(session, callback_url, device, logger=logging):
@@ -161,6 +165,7 @@ def request_remote_task_form(session, callback_url, device, logger=logging):
 
     except Exception as e:
         logger.error(f"Could not connect to server {callback_url.url}, with following information: {e}. check your connection...")
+        traceback.print_exc()
         return None
 
 

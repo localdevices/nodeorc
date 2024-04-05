@@ -102,7 +102,7 @@ class Device(BaseConfig):
         device_info["id"] = str(self.id)
         device_info["status"] = self.status.value
         device_info["form_status"] = self.form_status.value
-        device_info["nodeorc_version"] = self.nodeorc_version.value
+        device_info["nodeorc_version"] = self.nodeorc_version
 
         return device_info
 
@@ -169,6 +169,12 @@ class Settings(BaseConfig):
         nullable=False,
         comment="Flag for enabling automated shutdown after a task is performed. Must only be used if a power cycling "
                 "scheme is implemented and is meant to save power only."
+    )
+    reboot_after = Column(
+        Float,
+        default=0,
+        nullable=False,
+        comment="Float indicating the amount of seconds after which device reboots (0 means never reboot)"
     )
 
 

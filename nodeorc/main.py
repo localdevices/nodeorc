@@ -42,7 +42,7 @@ def get_docs_settings():
     docs += """================================================\n\n"""
     for f in fields:
         attr_doc = getattr(db.models.ActiveConfig, f).comment
-        docs += " {} : {}\n\n".format(f, attr_doc)
+        docs += " {} : {}\n\n".format(f[:-3], attr_doc)
     return docs
 
 
@@ -197,7 +197,8 @@ def start(storage, listen):
                 session=session,
                 callback_url=callback_url,
                 device=device,
-                logger=logger
+                logger=logger,
+                reboot_after=active_config.settings.reboot_after
             )
         else:
             # check for a new form with one single request

@@ -1,6 +1,7 @@
 import boto3
 import os
 import logging
+import time
 
 def check_bucket(s3, bucket_name):
     try:
@@ -67,3 +68,36 @@ def upload_io(obj, bucket, dest=None, logger=logging):
     r = bucket.upload_fileobj(obj, dest)
     logger.info(f"{bucket}/{dest} created")
     return r
+
+
+def is_file_size_changing(fn, delay=1):
+    """
+    Check if the file size changes over a certain amount of time. Can be used to check
+    if a file is being written into by another process.
+
+    Parameters
+    ----------
+    fn : str
+        path to file
+    delay : float
+        amount of delay time to check if file size changes
+
+    Returns
+    -------
+    bool
+        True (False) if file does (not) change
+
+    """
+    if not(os.path.isfile(fn)):
+        raise IOError(f"File {fn} does not exist")
+    # check if file is being written into, by checking changes in file size over a delay
+    size1 = os.path.getsize(fn)
+    time.sleep(delay)
+    if size1 != os.path.getsize(fn):
+        return True
+    else:
+        return False
+
+
+def reboot_now():
+    os.system("/sbin/shutdown -r now")

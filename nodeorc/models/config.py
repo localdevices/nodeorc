@@ -87,6 +87,7 @@ class Settings(BaseModel):
     water_level_datetimefmt: str
     allowed_dt: float
     shutdown_after_task: StrictBool = False
+    reboot_after: float = 0
 
     @field_validator("video_file_fmt")
     @classmethod

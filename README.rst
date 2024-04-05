@@ -1,4 +1,4 @@
-.. _readme::
+.. _readme:
 
 ================
 NodeOpenRiverCam
@@ -344,7 +344,7 @@ is sufficient drive space, starting with the oldest files first. If that is not
 sufficient, then results files will also be removed. If for
 some reason the space goes down further, then nodeorc will shut itself down to ensure
 that the compute device can still be accessed remotely. In the
-:ref:`configuration <config>` section you will find that you can alter the
+configuration section you will find that you can alter the
 thresholds, which default to 2GB and 1GB respectively.
 
 
@@ -390,7 +390,7 @@ current device.
 
 This would look as follows in the JSON-configuration file.
 
-.. code-block::
+.. code-block:: json
 
     {
        ...
@@ -442,7 +442,7 @@ in order to ensure that there is never a timezone issue between the platform on 
 This file naming convention can be configured by altering the field ``video_file_fmt`` under the ``settings`` section in
 the JSON file.
 
-.. code-block::
+.. code-block:: json
 
     {
        ...
@@ -464,6 +464,7 @@ Change the callback url details
 During setup, you will have configured the LiveORC on which the device will report
 and checks in for reconfiguration. You may alter this by changing the following
 settings:
+
 * ``url``: the main url to the LiveORC server
 * ``token_refresh_end_point``: normally you should never change this, unless in a
   later moment in time the name of this end point changes in the LiveORC code.
@@ -474,13 +475,18 @@ settings:
   refresh token is used, it also automatically expires and gets replaced by a new
   refresh token.
 
-{
-    "callback_url": {
-        "url": "http://127.0.0.1:8000",
-        "token_refresh_end_point": "/api/token/refresh/",
-        "token_refresh": "",
-        "token_access": ""
-    }
+Your resulting configuration section should look like this (tokens shown are not valid and should of course be replaced
+by your own token set).
+
+.. code-block:: json
+
+    {
+        "callback_url": {
+            "url": "http://openrivercam.com",
+            "token_refresh_end_point": "/api/token/refresh/",
+            "token_refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MjAyMjE2NTU5NywiaWF0IjoxNzA2ODA1NTk3LCJqdGkiOiI2YWJiODgxNGExNDA0NTFlYmE1YzQyMTMyNDM2YmUxZCIsInVzZXJfaWQiOjF9.ps1P8zA7EBRrRb2A4iA1X53D2TzSkCx1AzncIVpcdUE",
+            "token_access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzA2ODI3MTk3LCJpYXQiOjE3MDY4MDU1OTcsImp0aSI6IjU2MGE4NTM4MTViYzQ5ZDVhMzEwNWNhODU4NmQ2MzVmIiwidXNlcl9pZCI6MX0._ORAHl8z2bpkmP31jXfPkB_hLgEX2Rx6R5IFzcVmcyw"
+        }
 
 Water level file naming format and datetime format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

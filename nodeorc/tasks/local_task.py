@@ -14,8 +14,9 @@ import uuid
 from urllib.parse import urljoin
 from requests.exceptions import ConnectionError
 
-from .. import models, disk_mng, db, config
+from .. import models, disk_mng, db, config, utils
 from . import request_task_form
+
 
 device = db.session.query(db.models.Device).first()
 
@@ -39,8 +40,10 @@ class LocalTaskProcessor:
         self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
-        self.max_workers = max_workers
+        self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
+        self.processing = False  # state for checking if any processing is going on
+        self.reboot = False  # state that checks if a scheduled reboot should be done
         self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
@@ -74,11 +77,17 @@ class LocalTaskProcessor:
         )
         # start the timer for the disk manager
         disk_mng_t0 = time.time()
+        reboot_t0 = time.time()
+        get_task_form_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
                 if not os.path.isdir(self.disk_management.home_folder):
                     # usually happens when USB drive is removed
-                    self.logger.info(f"Home folder {self.disk_management.home_folder} is not available, probably disk is removed. Reboot to try to find disk.")
+                    self.logger.info(
+                        f"Home folder {self.disk_management.home_folder} is not "
+                        f"available, probably disk is removed. Reboot to try to find "
+                        f"disk. "
+                    )
                     os._exit(1)
 
                 file_paths = disk_mng.scan_folder(
@@ -86,7 +95,11 @@ class LocalTaskProcessor:
                     suffix=self.video_file_ext
                 )
                 for file_path in file_paths:
-                    if os.path.isfile(file_path) and file_path not in self.processed_files:
+                    # each file is checked if it is not yet in the queue and not
+                    # being written into
+                    if os.path.isfile(file_path) and \
+                            file_path not in self.processed_files and \
+                            not utils.is_file_size_changing(file_path):
                         self.logger.info(f"Found file: {file_path}")
                         # Submit the file processing task to the thread pool
                         executor.submit(
@@ -97,6 +110,15 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
+                # do housekeeping, reboots, new task forms, disk management
+                if self.settings["reboot_after"] != 0:
+                    if time.time() - reboot_t0 > max(self.settings["reboot_after"], 3600) and not self.reboot:
+                        self.logger.info(f"Reboot scheduled after any running task after {max(self.settings['reboot_after'], 3600)} seconds")
+                        self.reboot = True
+                self.reboot_now_or_not()
+                if time.time() - get_task_form_t0 > 300:
+                    get_task_form_t0 = time.time()
+                    self.get_new_task_form()
                 if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
@@ -108,6 +130,7 @@ class LocalTaskProcessor:
                     )
                     if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
+
 
 
     def cleanup_space(self, free_space):
@@ -161,11 +184,7 @@ class LocalTaskProcessor:
                 self.logger.warning(
                     f"Free space is {free_space} which is not yet under critical space {self.disk_management.critical_space}. Please contact your supplier for information.")
 
-    def process_file(
-            self,
-            file_path,
-    ):
-        # before any processing, check for new task forms online
+    def get_new_task_form(self):
         new_task_form_row = request_task_form(
             session=db.session,
             callback_url=self.callback_url,
@@ -176,6 +195,15 @@ class LocalTaskProcessor:
             # replace the task form template
             self.task_form_template = new_task_form_row.task_body
 
+    def process_file(
+            self,
+            file_path,
+    ):
+
+        # before any processing, check for new task forms online
+        self.get_new_task_form()
+
+
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
             self.disk_management.tmp_path,
@@ -184,6 +212,8 @@ class LocalTaskProcessor:
         # ensure the tmp path is in place
         if not(os.path.isdir(task_path)):
             os.makedirs(task_path)
+        # now we really start processing
+        self.processing = True
         try:
             url, filename = os.path.split(file_path)
             cur_path = file_path
@@ -272,9 +302,15 @@ class LocalTaskProcessor:
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
         # if callbacks were successful, try to send off old callbacks that were not successful earlier
+        self.logger.debug("Checking for old callbacks to send")
         self._post_old_callbacks()
+        # processing done, so set back to False
+        self.logger.debug("Processing done, setting processing state to False")
+        self.processing = False
         # shutdown if configured to shutdown after task
         self._shutdown_or_not()
+        # check if any reboots are needed and reboot
+        self.reboot_now_or_not()
 
     def _set_results_to_final_path(self, cur_path, dst_path, filename, task_path):
         """ move the results from temp to final destination and cleanup """
@@ -332,7 +368,22 @@ class LocalTaskProcessor:
 
         return success
 
+    def reboot_now_or_not(self):
+        """
+        Check for reboot requirement and reboot if nothing is being processed
+        """
+        if self.reboot:
+            # check if any processing is happening, if not, then reboot, else wait
+            if not self.processing:
+                self.logger.info("Rebooting now")
+                utils.reboot_now()
+
+
     def _post_old_callbacks(self):
+        """
+        Try to post remaining non-posted callbacks and change their states in database
+        if successful
+        """
         session_data = db.init_basedata.get_data_session()
         callback_records = session_data.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
@@ -364,6 +415,24 @@ def get_timestamp(
     parse_from_fn,
     fn_fmt,
 ):
+    """
+    Find time stamp from file name using expected file name template with datetime fmt
+
+    Parameters
+    ----------
+    fn : str
+        filename path
+    parse_from_fn : bool
+        If set to True, filename is used to parse timestamp using a filename template,
+        if False, timestamp is retrieved from the last change datetime of the file
+    fn_fmt : filename template with datetime format between {}
+
+    Returns
+    -------
+    datetime
+        timestamp of video file
+
+    """
     if parse_from_fn:
         datetime_fmt = fn_fmt.split("{")[1].split("}")[0]
         fn_template = fn_fmt.replace(datetime_fmt, "")
@@ -386,6 +455,22 @@ def get_timestamp(
 
 
 def read_water_level_file(fn, fmt):
+    """
+    Parse water level file using supplied datetime format
+
+    Parameters
+    ----------
+    fn : str
+        water level file
+    fmt : str
+        datetime format
+
+    Returns
+    -------
+    pd.DataFrame
+        content of water level file
+
+    """
     date_parser = lambda x: datetime.datetime.strptime(x, fmt)
     df = pd.read_csv(
         fn,
@@ -405,8 +490,26 @@ def get_water_level(
     file_fmt,
     datetime_fmt,
     allowed_dt=None,
-
 ):
+    """
+    Get water level from file(s)
+
+    Parameters
+    ----------
+    timestamp : datetime
+        timestamp to seek in water level file(s)
+    file_fmt : str
+        water level file template with possible datetime format in between {}
+    datetime_fmt : str
+        datetime format used inside water level files
+    allowed_dt : float
+        maximum difference between closest water level and video timestamp
+
+    Returns
+    -------
+    float
+        water level
+    """
     if "{" in file_fmt and "}" in file_fmt:
         datetimefmt = file_fmt.split("{")[1].split("}")[0]
         water_level_template = file_fmt.replace(datetimefmt, ":s")
@@ -441,6 +544,33 @@ def create_task(
     h_a,
     logger=logging
 ):
+    """
+    Create task for specific video file from generic task form
+
+    Parameters
+    ----------
+    task_form_template : dict
+        task form with specifics to be filled in
+    task_uuid : uuid
+        unique task id
+    task_path : str
+        path to temporary location where task is conducted
+    storage : permanent storage for results
+    filename : str
+        name of video file
+    timestamp : datetime
+        timestamp of video
+    h_a : float
+        actual water level during video
+    logger : logging
+        logger object
+
+    Returns
+    -------
+    Task
+        specific task for video
+
+    """
     task_form = copy.deepcopy(task_form_template)
     # prepare input_files field in task definition
     input_files = {
