@@ -78,6 +78,7 @@ class LocalTaskProcessor:
         # start the timer for the disk manager
         disk_mng_t0 = time.time()
         reboot_t0 = time.time()
+        get_task_form_t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.event.is_set():
                 if not os.path.isdir(self.disk_management.home_folder):
@@ -98,7 +99,7 @@ class LocalTaskProcessor:
                     # being written into
                     if os.path.isfile(file_path) and \
                             file_path not in self.processed_files and \
-                            utils.is_file_size_changing_and_not(file_path):
+                            not utils.is_file_size_changing(file_path):
                         self.logger.info(f"Found file: {file_path}")
                         # Submit the file processing task to the thread pool
                         executor.submit(
@@ -109,10 +110,15 @@ class LocalTaskProcessor:
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
-                # do housekeeping, reboots, disk management
-                if time.time() - reboot_t0 > self.settings.reboot_after():
-                    self.reboot = True
-                self.reboot_now()
+                # do housekeeping, reboots, new task forms, disk management
+                if self.settings["reboot_after"] != 0:
+                    if time.time() - reboot_t0 > max(self.settings["reboot_after"], 3600) and not self.reboot:
+                        self.logger.info(f"Reboot scheduled after any running task after {max(self.settings['reboot_after'], 3600)} seconds")
+                        self.reboot = True
+                self.reboot_now_or_not()
+                if time.time() - get_task_form_t0 > 300:
+                    get_task_form_t0 = time.time()
+                    self.get_new_task_form()
                 if time.time() - disk_mng_t0 > self.disk_management.frequency:
                     # reset the disk management t0 counter
                     disk_mng_t0 = time.time()
@@ -178,12 +184,7 @@ class LocalTaskProcessor:
                 self.logger.warning(
                     f"Free space is {free_space} which is not yet under critical space {self.disk_management.critical_space}. Please contact your supplier for information.")
 
-    def process_file(
-            self,
-            file_path,
-    ):
-
-        # before any processing, check for new task forms online
+    def get_new_task_form(self):
         new_task_form_row = request_task_form(
             session=db.session,
             callback_url=self.callback_url,
@@ -193,6 +194,15 @@ class LocalTaskProcessor:
         if new_task_form_row:
             # replace the task form template
             self.task_form_template = new_task_form_row.task_body
+
+    def process_file(
+            self,
+            file_path,
+    ):
+
+        # before any processing, check for new task forms online
+        self.get_new_task_form()
+
 
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
@@ -292,13 +302,15 @@ class LocalTaskProcessor:
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
         # if callbacks were successful, try to send off old callbacks that were not successful earlier
+        self.logger.debug("Checking for old callbacks to send")
         self._post_old_callbacks()
         # processing done, so set back to False
+        self.logger.debug("Processing done, setting processing state to False")
         self.processing = False
-        # check if any reboots are needed
-        self.reboot_now()
         # shutdown if configured to shutdown after task
         self._shutdown_or_not()
+        # check if any reboots are needed and reboot
+        self.reboot_now_or_not()
 
     def _set_results_to_final_path(self, cur_path, dst_path, filename, task_path):
         """ move the results from temp to final destination and cleanup """
@@ -356,13 +368,14 @@ class LocalTaskProcessor:
 
         return success
 
-    def reboot_now(self):
+    def reboot_now_or_not(self):
         """
         Check for reboot requirement and reboot if nothing is being processed
         """
         if self.reboot:
             # check if any processing is happening, if not, then reboot, else wait
             if not self.processing:
+                self.logger.info("Rebooting now")
                 utils.reboot_now()
 
 
