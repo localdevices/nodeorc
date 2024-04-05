@@ -88,7 +88,7 @@ are outlined below:
 .. code-block:: shell
 
     # get script from latest release
-    wget https://github.com/localdevices/nodeorc/releases/latest/setup.sh
+    wget https://github.com/localdevices/nodeorc/releases/latest/download/setup.sh
     # make the setup script executable
     chmod +x setup.sh
     # execute script

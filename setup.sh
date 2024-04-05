@@ -63,7 +63,6 @@ install_dependencies () {
   echo 'Dependencies installed. Now install NodeORC.'
 }
 
-
 install_nodeorc () {
     echo "========================================================================"
     echo 'INSTALLING NODEOPENRIVERCAM'
@@ -72,7 +71,7 @@ install_nodeorc () {
         # activate the new environment
         source $HOME/venv/nodeorc/bin/activate
         # install the current source code
-        pip install .
+        pip install --upgrade nodeorc
         deactivate
     echo ''
     echo '------------------------------------------------------------------------'
