@@ -252,6 +252,7 @@ class LocalTaskProcessor:
                     datetime_fmt=self.settings["water_level_datetimefmt"],
                     allowed_dt=self.settings["allowed_dt"]
                 )
+                self.logger.info(f"Water level found with value {h_a} m.")
             except Exception as e:
                 message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
                 device.message = message
@@ -273,14 +274,16 @@ class LocalTaskProcessor:
             # process the task
             task.execute(task_path)
             # if the video was treated successfully, then we may move it to a location of interest if wanted
-            if self.disk_management.success_path:
+            if self.disk_management.results_path:
                 dst_path = os.path.join(
-                    self.disk_management.success_path,
+                    self.disk_management.results_path,
                     timestamp.strftime("%Y%m%d")
                 )
             # video is success, if task form is still CANDIDATE, upgrade to ACCEPTED
             config.patch_active_config_to_accepted()
             # perform the callbacks here only when video was successfully completed
+            # set files and cleanup
+            self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
             callback_success = self._post_callbacks(task.callbacks)
 
         except Exception as e:
@@ -294,16 +297,17 @@ class LocalTaskProcessor:
                 dst_path = os.path.join(self.disk_management.failed_path, timestamp.strftime("%Y%m%d"))
             else:
                 dst_path = self.disk_management.failed_path
+            # set files and cleanup
+            self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
             # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
             task_form_template = config.get_active_task_form(db.session, parse=False)
 
-        # set files and cleanup
-        self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
         # if callbacks were successful, try to send off old callbacks that were not successful earlier
-        self.logger.debug("Checking for old callbacks to send")
-        self._post_old_callbacks()
+        if callback_success:
+            self.logger.debug("Checking for old callbacks to send")
+            self._post_old_callbacks()
         # processing done, so set back to False
         self.logger.debug("Processing done, setting processing state to False")
         self.processing = False
@@ -325,7 +329,7 @@ class LocalTaskProcessor:
             shutil.rmtree(task_path)
 
     def _shutdown_or_not(self):
-        if self.shutdown_after_task:
+        if self.settings["shutdown_after_task"]:
             self.logger.info("Task done! Shutting down...")
             os.system("/sbin/shutdown -h now")
 
@@ -586,6 +590,7 @@ def create_task(
             tmp_name=v["tmp_name"]
         ) for k, v in task_form["output_files"].items()
     }
+    all_files = dict(**input_files, **output_files)
     # callback jsons are converted to Callback objects
     callbacks = []
     for cb in task_form["callbacks"]:
@@ -601,7 +606,7 @@ def create_task(
         if "files_to_send" in cb:
             files_to_send = cb.pop("files_to_send")
             if files_to_send:
-                cb["files_to_send"] = {fn: output_files[fn] for fn in files_to_send}
+                cb["files_to_send"] = {fn: all_files[fn] for fn in files_to_send}
         cb_obj = models.Callback(
             storage=storage,
             timestamp=timestamp,
