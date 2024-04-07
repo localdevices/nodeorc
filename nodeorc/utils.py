@@ -101,3 +101,5 @@ def is_file_size_changing(fn, delay=1):
 
 def reboot_now():
     os.system("/sbin/shutdown -r now")
+    # in case this fails, do a sudo shutdown
+    os.system("sudo /sbin/shutdown -r now")
