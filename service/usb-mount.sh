@@ -33,18 +33,6 @@ do_mount()
     # Get info for this drive: $ID_FS_LABEL, $ID_FS_UUID, and $ID_FS_TYPE
     eval $(/sbin/blkid -o udev ${DEVICE})
 
-    # # Figure out a mount point to use
-    # LABEL=${ID_FS_LABEL}
-    # if [[ -z "${LABEL}" ]]; then
-    #     LABEL=${DEVBASE}
-    # elif /bin/grep -q " /media/${LABEL} " /etc/mtab; then
-    #     # Already in use, make a unique one
-    #     LABEL+="-${DEVBASE}"
-    # fi
-    # MOUNT_POINT="/media/${LABEL}"
-    # 
-    # echo "Mount point: ${MOUNT_POINT}"
-
     /bin/mkdir -p ${MOUNT_POINT}
 
     # Global mount options
