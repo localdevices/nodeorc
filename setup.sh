@@ -82,8 +82,8 @@ install_nodeorc () {
 install_service () {
     # export variables for some static files below
     export SCRIPT_FOLDER=$PWD/$(dirname $0)
-    export CONFIG_TEMPLATE="${SCRIPT_FOLDER}/settings/config_template.json"
-    export CONFIG_NEW="${SCRIPT_FOLDER}/settings/config_device.json"
+    export CONFIG_TEMPLATE="${HOME}/.nodeorc/config_template.json"
+    export CONFIG_NEW="${HOME}/.nodeorc/config_device.json"
     export CONFIG_DBASE=${HOME}/.nodeorc/nodeorc_config.db
 
     echo "========================================================================"
@@ -300,6 +300,36 @@ setup_usb_mount() {
 }
 setup_nodeorc_config(){
     source ${HOME}/venv/nodeorc/bin/activate
+	cat > ${CONFIG_TEMPLATE} <<EOF
+{
+    "callback_url": {
+        "url": "http://127.0.0.1:8000",
+        "token_refresh_end_point": "/api/token/refresh/",
+        "token_refresh": "",
+        "token_access": ""
+    },
+    "storage": {
+        "url": "./tmp",
+        "bucket_name": "examplevideo"
+    },
+    "settings": {
+        "parse_dates_from_file": true,
+        "video_file_fmt": "{%Y%m%d_%H%M%S}.mp4",
+        "water_level_fmt": "all_levels.txt",
+        "water_level_datetimefmt": "%Y%m%d_%H%M%S",
+        "allowed_dt": 3600,
+        "shutdown_after_task": false,
+        "reboot_after": 86400
+
+    },
+    "disk_management": {
+        "home_folder": "",
+        "min_free_space": 2,
+        "critical_space": 1,
+        "frequency": 3600
+    }
+}
+EOF
 
     echo "Setting up configuration with LiveORC connection to ${URL}..."
     jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\" | .disk_management.home_folder=\"${NODEORC_DATA_PATH}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
