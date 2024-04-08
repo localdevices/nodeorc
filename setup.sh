@@ -269,9 +269,9 @@ setup_usb_mount() {
     export usb_mount_script="${HOME}/.nodeorc/service/usb-mount.sh"
     export usb_mount_service="${HOME}/.nodeorc/service/usb-mount@.service"
     export udev_rule_usb="${HOME}/.nodeorc/service/10-toggleusbstick.rules"
-	mkdir ${HOME}/.nodeorc/service
-	# create scripts
-	cat ${usb_mount_script} <<EOF
+    mkdir ${HOME}/.nodeorc/service
+    # create scripts
+    cat ${usb_mount_script} <<EOF
 #!/bin/bash
 
 # This script is called from our systemd unit file to mount or unmount
@@ -361,7 +361,7 @@ case "${ACTION}" in
         ;;
 esac
 EOF
-	cat ${usb_mount_service} <<EOF
+    cat ${usb_mount_service} <<EOF
 [Unit]
 Description=Mount USB drive at /mnt/usb
 
@@ -372,7 +372,7 @@ ExecStart=/usr/local/bin/usb-mount.sh add %i
 ExecStop=/usr/local/bin/usb-mount.sh remove %i
 EOF
 
-	cat ${udev_rule_usb} <<EOF
+    cat ${udev_rule_usb} <<EOF
 SUBSYSTEMS=="usb", KERNEL=="sd[a-z][0-9]", ACTION=="add", RUN+="/bin/systemctl start usb-mount@%k.service"
 SUBSYSTEMS=="usb", KERNEL=="sd[a-z][0-9]", ACTION=="remove", RUN+="/bin/systemctl stop usb-mount@%k.service"
 SUBSYSTEMS=="usb", KERNEL=="sd[a-z]", ACTION=="add", RUN+="/bin/systemctl start usb-mount@%k.service"
@@ -408,7 +408,8 @@ EOF
 }
 setup_nodeorc_config(){
     source ${HOME}/venv/nodeorc/bin/activate
-	cat > ${CONFIG_TEMPLATE} <<EOF
+    echo "Creating configuration template in ${CONFIG_TEMPLATE}"
+    cat > ${CONFIG_TEMPLATE} <<EOF
 {
     "callback_url": {
         "url": "http://127.0.0.1:8000",
@@ -438,7 +439,7 @@ setup_nodeorc_config(){
     }
 }
 EOF
-
+    echo "Parsing configuration file from template to ${CONFIG_NEW}"
     echo "Setting up configuration with LiveORC connection to ${URL}..."
     jq ".callback_url.url=\"${URL}\" | .callback_url.token_refresh=\"${REFRESH}\" | .callback_url.token_access=\"${ACCESS}\" | .disk_management.home_folder=\"${NODEORC_DATA_PATH}\"" ${CONFIG_TEMPLATE} > ${CONFIG_NEW}
 
