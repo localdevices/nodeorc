@@ -332,7 +332,8 @@ class LocalTaskProcessor:
         if self.settings["shutdown_after_task"]:
             self.logger.info("Task done! Shutting down...")
             os.system("/sbin/shutdown -h now")
-            os.system("sudo /sbin/shutdown -h now")
+            os.system("/bin/sudo /sbin/shutdown -h now")
+            os.system("/usr/bin/sudo /sbin/shutdown -h now")
 
     def _post_callbacks(self, callbacks):
         """

@@ -60,6 +60,7 @@ def get_bucket(
     else:
         return None
 
+
 def upload_io(obj, bucket, dest=None, logger=logging):
     """
     Uploads BytesIO obj representation of data in file 'fn' in bucket
@@ -102,4 +103,5 @@ def is_file_size_changing(fn, delay=1):
 def reboot_now():
     os.system("/sbin/shutdown -r now")
     # in case this fails, do a sudo shutdown
-    os.system("sudo /sbin/shutdown -r now")
+    os.system("/bin/sudo /sbin/shutdown -r now")
+    os.system("/usr/bin/sudo /sbin/shutdown -r now")
