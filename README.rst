@@ -529,17 +529,17 @@ processing before rebooting. The default value is 86400 (i.e. one day).
 
 .. _LiveORC: https://github.com/localdevices/LiveORC
 
-.. |pypi| image:: https://badge.fury.io/py/nodeopenrivercam.svg
+.. |pypi| image:: https://badge.fury.io/py/nodeorc.svg
     :alt: PyPI
-    :target: https://pypi.org/project/nodeopenrivercam/
+    :target: https://pypi.org/project/nodeorc/
 
-.. |piwheels| image:: https://img.shields.io/piwheels/v/:wheel
+.. |piwheels| image:: https://img.shields.io/piwheels/v/nodeorc
    :alt: PiWheels Version
    :target: https://localdevice.github.io/nodeorc/latest
 
 .. |docs_latest| image:: https://img.shields.io/badge/docs-latest-brightgreen.svg
     :alt: Latest documentation
-    :target: https://localdevice.github.io/nodeorc/latest
+    :target: https://github.com/localdevices/nodeorc
 
 
 .. |license| image:: https://img.shields.io/github/license/localdevices/nodeorc?style=flat
