@@ -13,7 +13,7 @@ import logging as logger
 # if no files are returned, then simply make files=None
 
 def discharge(callback):
-    # open the last file, which contains the transect
+    # Send the resulting discharge as a time series object (currently the only time series callback available).
     fn = os.path.join(
         callback.storage.url,
         callback.storage.bucket_name,
@@ -45,20 +45,8 @@ def discharge(callback):
     return msg, files
 
 def video(callback):
-    """
-    Creates a video callback of an already processed video. Assumes that the processing status is DONE
-
-    Parameters
-    ----------
-    task
-    subtask
-    tmp
-    kwargs
-
-    Returns
-    -------
-
-    """
+    """Send the results of a video, in a plot, include the video itself for further situational awareness or enabling of
+    reanalysis and research."""
     video_fn = os.path.join(
         callback.storage.url,
         callback.storage.bucket_name,
@@ -83,6 +71,8 @@ def video(callback):
     return msg, files
 
 def video_no_file(callback):
+    """Send the results of a video, in a plot, but do not send over the video. Use this callback when storage is
+    limited and/or when bandwidth to send results is limited."""
     img_fn = os.path.join(
         callback.storage.url,
         callback.storage.bucket_name,
