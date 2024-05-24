@@ -60,6 +60,9 @@ class Storage(BaseModel):
         -------
 
         """
+        dirname = os.path.dirname(trg)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
         if keep_src:
             shutil.copyfile(
                 os.path.join(self.bucket, src),
