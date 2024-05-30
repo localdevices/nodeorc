@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 # nodeodm specific imports
 from . import CallbackUrl, Storage, S3Storage, File, Subtask, Callback, REMOVE_FOR_TEMPLATE
 
+
 class Task(BaseModel):
     """
     Definition of an entire task
@@ -43,9 +44,7 @@ class Task(BaseModel):
             subtask.replace_files(self.input_files, self.output_files)
         return self
 
-
-
-    def execute(self, tmp):
+    def execute(self, tmp, keep_src=False):
         """
         Execute the entire task logic
 
@@ -64,7 +63,7 @@ class Task(BaseModel):
         try:
             self.logger.info(f"Performing task defined at {self.timestamp} with id {self.id}")
             self.logger.info(f"Downloading all inputs to {tmp}")
-            self.download_input(tmp)
+            self.download_input(tmp, keep_src=keep_src)
             # then perform all subtasks in order, upload occur within the subtasks
             self.logger.info(f"Executing subtasks")
             self.execute_subtasks(tmp, timestamp=self.timestamp)
@@ -85,7 +84,7 @@ class Task(BaseModel):
         #     self.logger.error(f"Task id {str(self.id)} failed with code {r.status_code} and message {r.json()}")
         #     raise Exception("Error detected, restarting node")
 
-    def download_input(self, tmp):
+    def download_input(self, tmp, keep_src=False):
         """
         Downloads all required inputs to a required temp path
 
@@ -98,7 +97,7 @@ class Task(BaseModel):
         for key, file in self.input_files.items():
             trg = os.path.join(tmp, file.tmp_name)
             # put the input file on tmp location
-            self.storage.download_file(file.remote_name, trg)
+            self.storage.download_file(file.remote_name, trg, keep_src=keep_src)
             # self.storage.bucket.download_file(file.remote_name, trg)
 
 

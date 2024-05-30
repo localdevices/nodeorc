@@ -2,14 +2,13 @@ import click
 import json
 import os
 
-import nodeorc
+# import nodeorc
 from pydantic import ValidationError
 from dotenv import load_dotenv
 # import tasks
-# from nodeorc import settings_path, db, config
 
 # import nodeorc specifics
-from . import db, log, models, config, tasks, settings_path, __version__
+from . import db, log, models, config, tasks, cli_utils, settings_path, __version__
 
 
 session = db.session
@@ -169,71 +168,73 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
         ctx.obj = {}
 
 @cli.command(short_help="Start main daemon")
-@storage_opt
-@listen_opt
-def start(storage, listen):
+# @storage_opt
+# @listen_opt
+def start():
     # get the device id
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
-    if listen == "local" and storage == "remote":
-        raise click.UsageError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
-                              '"--storage remote").')
-    if listen == "local":
-        # get the stored configuration
-        active_config = config.get_active_config(parse=True)
-        if not(active_config):
-            raise click.UsageError('You do not yet have an active configuration. Upload an activate configuration '
-                                  'through the CLI. Type "nodeorc upload-config --help" for more information')
+    # if listen == "local" and storage == "remote":
+    #     raise click.UsageError('Locally defined tasks ("--listen local")  cannot have remotely defined storage ('
+    #                           '"--storage remote").')
+    # if listen == "local":
+    # get the stored configuration
+    active_config = config.get_active_config(parse=True)
+    if not(active_config):
+        raise click.UsageError(
+            'You do not yet have an active configuration. Upload an activate configuration '
+            'through the CLI. Type "nodeorc upload-config --help" for more information'
+        )
 
-        # initialize the database for storing data
-        session_data = db.init_basedata.get_data_session()
-        # read the task form from the configuration
-        task_form_template = config.get_active_task_form(session, parse=True)
-        callback_url = active_config.callback_url
-        if task_form_template is None:
-            # go into the task form get daemon and try to acquire a task form from server every 5 minutes
-            logger.info("Awaiting task by requesting a new task every 5 seconds")
-            tasks.wait_for_task_form(
-                session=session,
-                callback_url=callback_url,
-                device=device,
-                logger=logger,
-                reboot_after=active_config.settings.reboot_after
-            )
-        else:
-            # check for a new form with one single request
-            logger.info("Checking if a new task form is available for me...")
-            new_task_form_row = tasks.request_task_form(
-                session=session,
-                callback_url=callback_url,
-                device=device,
-                logger=logger
-            )
-            if new_task_form_row:
-                task_form_template = new_task_form_row.task_body
-        # verify that task_template can be converted to a valid Task
-        try:
-            task_test = models.Task(**task_form_template)
-        except Exception as e:
-            logger.error(
-                f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
-            )
-            # This only happens with version upgrades. Update the status to BROKEN and report back to platform
-            task_form_template = config.get_active_task_form(session, parse=False)
-            task_form_template.status = db.models.TaskFormStatus.BROKEN
-            device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
-            session.commit()
-        try:
-            processor = tasks.LocalTaskProcessor(
-                task_form_template=task_form_template,
-                logger=logger,
-                **active_config.model_dump()
-            )
-            processor.await_task()
-        except Exception as e:
-            logger.error("Reboot service: %s" % str(e))
+    # initialize the database for storing data
+    session_data = db.init_basedata.get_data_session()
+    # read the task form from the configuration
+    task_form_template = config.get_active_task_form(session, parse=True)
+    callback_url = active_config.callback_url
+    if task_form_template is None:
+        # go into the task form get daemon and try to acquire a task form from server every 5 minutes
+        logger.info("Awaiting task by requesting a new task every 5 seconds")
+        tasks.wait_for_task_form(
+            session=session,
+            callback_url=callback_url,
+            device=device,
+            logger=logger,
+            reboot_after=active_config.settings.reboot_after
+        )
     else:
-        raise NotImplementedError
+        # check for a new form with one single request
+        logger.info("Checking if a new task form is available for me...")
+        new_task_form_row = tasks.request_task_form(
+            session=session,
+            callback_url=callback_url,
+            device=device,
+            logger=logger
+        )
+        if new_task_form_row:
+            task_form_template = new_task_form_row.task_body
+    # verify that task_template can be converted to a valid Task
+    try:
+        task_test = models.Task(**task_form_template)
+    except Exception as e:
+        logger.error(
+            f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
+        )
+        # This only happens with version upgrades. Update the status to BROKEN and report back to platform
+        task_form_template = config.get_active_task_form(session, parse=False)
+        task_form_template.status = db.models.TaskFormStatus.BROKEN
+        device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
+        session.commit()
+    try:
+        processor = tasks.LocalTaskProcessor(
+            task_form_template=task_form_template,
+            logger=logger,
+            **active_config.model_dump()
+        )
+        processor.await_task()
+    except Exception as e:
+        logger.error("Reboot service: %s" % str(e))
+    # else:
+    #     raise NotImplementedError
 
 @cli.command(
     short_help="Upload a new configuration for this device from a JSON formatted file",
@@ -255,10 +256,9 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config = load_config(json_file)
-    rec = nodeorc.config.add_config(session, config=config, set_as_active=set_as_active)
+    rec = config.add_config(session, config=config, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
-upload_config.__doc__ = get_docs_settings()
 # def main():
 #     connection = pika.BlockingConnection(
 #         pika.URLParameters(
@@ -281,6 +281,16 @@ upload_config.__doc__ = get_docs_settings()
 #         channel.stop_consuming()
 #         connection.close()
 #         traceback.print_tb(e.__traceback__)
+
+@cli.command(short_help="Start cloud processor")
+# @storage_opt
+# @listen_opt
+# def start_cloud(storage, listen):
+def start_cloud():
+    cli_utils.cloud_processor()
+
+
+upload_config.__doc__ = get_docs_settings()
 
 if __name__ == "__main__":
     cli()

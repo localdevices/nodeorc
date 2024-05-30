@@ -3,6 +3,7 @@ import os
 import logging
 import time
 
+
 def check_bucket(s3, bucket_name):
     try:
         bucket = s3.Bucket(bucket_name)
@@ -28,14 +29,14 @@ def check_bucket(s3, bucket_name):
 
 def get_s3(
     endpoint_url,
-    aws_access_key_id,
-    aws_secret_access_key,
+    access_key,
+    secret_key,
 ):
     return boto3.resource(
         "s3",
         endpoint_url=endpoint_url,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         config=boto3.session.Config(signature_version="s3v4"),
         verify=False
     )
