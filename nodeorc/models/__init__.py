@@ -17,10 +17,12 @@ def check_datetime_fmt(fn_fmt):
         raise ValueError(f'Date format "{fmt}" is not a valid date format pattern')
     return True
 
-from .storage import Storage, S3Storage, File
+
+from .storage import Storage, S3Storage, File, get_storage
 from .callback_url import CallbackUrl
 from .callback import Callback
 from .subtask import Subtask
 from .task import Task
 from .config import LocalConfig, RemoteConfig, DiskManagement, Settings
+
 
