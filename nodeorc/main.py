@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # import tasks
 
 # import nodeorc specifics
-from . import db, log, models, config, tasks, cli_utils, settings_path, __version__
+from . import db, log, models, config, tasks, settings_path, __version__
 
 
 session = db.session
@@ -281,13 +281,6 @@ def upload_config(json_file, set_as_active):
 #         channel.stop_consuming()
 #         connection.close()
 #         traceback.print_tb(e.__traceback__)
-
-@cli.command(short_help="Start cloud processor")
-# @storage_opt
-# @listen_opt
-# def start_cloud(storage, listen):
-def start_cloud():
-    cli_utils.cloud_processor()
 
 
 upload_config.__doc__ = get_docs_settings()
