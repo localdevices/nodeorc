@@ -15,4 +15,3 @@ from . import callbacks
 from . import disk_mng
 from . import db
 from . import config
-from . import cli_utils
