@@ -471,7 +471,7 @@ After=network.target
 User=${USER}
 WorkingDirectory=${PWD}
 Environment="PATH=${HOME}/venv/nodeorc/bin"
-ExecStart=${HOME}/venv/nodeorc/bin/nodeorc start --storage local --listen local
+ExecStart=${HOME}/venv/nodeorc/bin/nodeorc start
 Restart=always
 
 [Install]
