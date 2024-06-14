@@ -13,7 +13,7 @@ dependencies = [
     "ibm-cos-sdk",
     "pika",
     "pydantic==2.3.0",
-    "pyopenrivercam",
+    "pyopenrivercam==0.5.5",
     "python-dotenv",
     "requests",
     "sqlalchemy"
