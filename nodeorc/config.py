@@ -26,6 +26,8 @@ def add_config(
 
     settings_record = db.models.Settings(**config_dict["settings"])
     disk_management_record = db.models.DiskManagement(**config_dict["disk_management"])
+    storage = config_dict["storage"]
+    storage.pop("options")  # get rid of options parameter, not relevant for dbase
     storage_record = db.models.Storage(**config_dict["storage"])
     # callback_url_record = db_models.CallbackUrl(**config_dict["callback_url"])
     url = config.callback_url.model_dump()
