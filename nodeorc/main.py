@@ -254,8 +254,8 @@ def start():
 def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
-    config = load_config(json_file)
-    rec = config.add_config(session, config=config, set_as_active=set_as_active)
+    config_ = load_config(json_file)
+    rec = config.add_config(session, config=config_, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 # def main():
