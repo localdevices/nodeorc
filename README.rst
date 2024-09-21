@@ -1,5 +1,15 @@
 .. _readme:
 
+.. raw:: html
+
+    <embed>
+        <figure>
+            <img src="https://raw.githubusercontent.com/localdevices/pyorc/main/docs/_static/orc_logo_color.svg"
+        width=100 align="right">
+        </figure>
+        <br>
+    </embed>
+
 ================
 NodeOpenRiverCam
 ================
@@ -525,6 +535,18 @@ processing before rebooting. The default value is 86400 (i.e. one day).
         "reboot_after": 86400
 
     },
+
+License
+=======
+
+NodeORC is licensed under the terms of the
+[GNU Affero General Public License v3.0](https://github.com/localdevices/LiveORC/blob/main/LICENSE)
+
+Trademark
+=========
+
+See our [OpenRiverCam Trademark guidelines](https://github.com/localdevices/pyorc/blob/main/TRADEMARK.md)
+
 
 
 .. _LiveORC: https://github.com/localdevices/LiveORC
