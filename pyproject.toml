@@ -10,17 +10,16 @@ authors = [
 dependencies = [
     "boto3",
     "dask[distributed]",
-    "ibm-cos-sdk",
     "pika",
     "pydantic==2.3.0",
-    "pyopenrivercam==0.5.5",
+    "pyopenrivercam==0.6.0",
     "python-dotenv",
     "requests",
     "sqlalchemy"
 ]
 
 requires-python =">=3.9"
-readme = "README.rst"
+readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -31,25 +30,17 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11"
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12"
 ]
 dynamic = ['version', 'description']
 
 [project.optional-dependencies]
-io = [
-]
-extra = [
-]
 test = [
     "pytest",
     "pytest-cov",
     "pytest-lazy-fixtures"
 ]
-docs = [
-]
-
-full = ["nodeorc[io,extra,dev,test,doc]"]
-slim = ["nodeorc[io]"]
 
 [project.urls]
 Source = "https://github.com/localdevices/nodeorc"
