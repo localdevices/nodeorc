@@ -48,8 +48,7 @@ can connect as many NodeOpenRiverCam devices to a LiveOpenRiverCam server as you
     Credits SEBA and Photrack for site setup and the hardware.</figcaption>
 </figure>
 
-# Acknowl
-edgements
+# Acknowledgements
 
 > [!IMPORTANT] 
 > NodeOpenRiverCam is being developed in the TEMBO Africa project. The TEMBO Africa project has received 
@@ -234,18 +233,26 @@ If you have for instance identified the USB-drive as location for storage, then 
 in ``/mnt/usb/incoming``. If you for instance have a raspberry pi setup, and you want to make a regular video upon
 booting the device, you may for instance run a script upon boot that looks as follows (make sure your raspi camera
 is switched on and that the necessary libraries are installed). The script can be run e.g. through a cronjob or
-by adding it to your profile.
+by running it as part of your profile files.
 
 ```shell
 #!/bin/bash
-# NOTE! THIS CODE HAS NOT BEEN TESTED.
 # make a datetime string, to identify the utc time of the video
 export trg_path="/mnt/usb/incoming"
 export dt=`date '+%Y%m%d_%H%M%S'`
-filename=${trg_path}/${dt}.h264
+filename=${trg_path}/${dt}.mp4
 # record the video
-raspivid --height 1080 --bitrate 20000000 --timeout 5 --framerate 30 --output ${filename}
+libcamera-vid --height 1080 --bitrate 20000000 -t 5000 --framerate 30 --output temp.h264
+# copy raw .h264 file to more generally accepted .mp4 format
+ffmpeg -i temp.h264 -c copy temp.mp4
+# canonical rename file to the right filename and position
+mv temp.mp4 ${filename}
+# cleanup
+rm temp.h264
 ```
+Note that here first a video is captured toa temporary file, which is renamed (and mpoved) to the right location only
+at the end. This is a good practice to ensure files are entirely completed in writing prior to treating them.
+
 For other camera setups, the manner in which you get videos in the right folder may strongly depend on the brand and
 type. Most likely camera-specific settings are needed.
 
@@ -253,7 +260,6 @@ As soon as a file is appearing in the incoming folder, nodeorc will capture this
 add that file in the queue. If currently nothing is being processed, nodeorc will
 immediately start processing it. If an earlier file is being processed the new file
 is queued up until the previous video is done.
-
 
 ### Failed and success folder
 
