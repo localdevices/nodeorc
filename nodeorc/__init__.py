@@ -1,6 +1,6 @@
 """NodeORC: Automated edge and cloud image-based discharge estimation with OpenRiverCam"""
 import os
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __home__ = os.path.join(os.path.expanduser("~"), ".nodeorc")
 if not(os.path.isdir(__home__)):
