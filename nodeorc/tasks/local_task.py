@@ -146,8 +146,7 @@ class LocalTaskProcessor:
         """
         ret = disk_mng.purge(
             [
-                self.settings["success_path"],
-                self.settings["failed_path"],
+                os.path.join(self.disk_management.home_folder, "failed"),
             ],
             free_space=free_space,
             min_free_space=self.disk_management.min_free_space,
@@ -159,7 +158,7 @@ class LocalTaskProcessor:
             self.logger.warning(f"Space after purging still not enough, purging results folder")
             ret = disk_mng.purge(
                 [
-                    self.settings["results_path"]
+                    os.path.join(self.disk_management.home_folder, "results")
                 ],
                 free_space=free_space,
                 min_free_space=self.disk_management.min_free_space,
