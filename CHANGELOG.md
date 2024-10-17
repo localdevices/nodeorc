@@ -1,5 +1,15 @@
 ## [0.2.0] - 2024-09-26
 ### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+- move to `pyopenrivercam=0.6.1` to prevent issues with new `rasterio=1.4.0`
+### Security
+
+
+## [0.2.0] - 2024-09-26
+### Added
 - OpenRiverCam Logos and trademarks
 ### Changed
 - `README.rst` changed into `README.md`
