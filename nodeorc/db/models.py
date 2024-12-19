@@ -7,11 +7,10 @@ import socket
 import uuid
 
 from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base
 
-from .. import models
-from .. import __version__
+from nodeorc import models
+from nodeorc import __version__
 
 class TaskFormStatus(enum.Enum):
     NEW = 1  # task form that does not pass through validation
@@ -323,7 +322,7 @@ class TaskForm(BaseConfig):
 class Callback(BaseData):
     __tablename__ = "callback"
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
     body = Column(JSON)
 
     def __str__(self):
@@ -338,3 +337,27 @@ class Callback(BaseData):
         return models.Callback(**body)
 
 
+class WaterLevel(BaseData):
+    """
+    Represents water level data with timestamp and value.
+
+    This class is used to define and manage water level records in NodeORC database.
+    It is designed to store the time of measurement and the corresponding water
+    level value. It can be utilized for environmental monitoring, flood prediction,
+    and other relevant applications. The data is stored as structured records,
+    facilitating analysis and querying.
+
+    Attributes
+    ----------
+    id : int
+        Unique identifier for each water level record.
+    timestamp : datetime.datetime
+        The date and time when the water level measurement was taken. Defaults to
+        the current UTC datetime at the time of record creation.
+    level : float
+        The measured water level value. This attribute is mandatory.
+    """
+    __tablename__ = "water_level"
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    level = Column(Float, nullable=False)

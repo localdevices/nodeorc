@@ -1,7 +1,6 @@
 requests
 boto3
 dask[distributed]
-ibm-cos-sdk
 pika
 pydantic==2.3.0
 pyopenrivercam

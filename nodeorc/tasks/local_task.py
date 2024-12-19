@@ -1,22 +1,21 @@
+import concurrent.futures
 import copy
+import datetime
+import logging
+import multiprocessing
+import os
 import shutil
 import sys
 import threading
-import concurrent.futures
-import logging
-import multiprocessing
-import numpy as np
-import os
-import pandas as pd
 import time
-import datetime
 import uuid
 from urllib.parse import urljoin
-from requests.exceptions import ConnectionError
 
-from .. import models, disk_mng, db, config, utils
+import numpy as np
+
 from . import request_task_form
-
+from .. import models, disk_mng, db, config, utils
+from .. import water_level
 
 device = db.session.query(db.models.Device).first()
 
@@ -245,7 +244,7 @@ class LocalTaskProcessor:
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
             try:
-                h_a = get_water_level(
+                h_a = water_level.get_water_level(
                     timestamp,
                     file_fmt=self.water_level_file_template,
                     datetime_fmt=self.settings["water_level_datetimefmt"],
@@ -458,86 +457,6 @@ def get_timestamp(
         timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(fn))
     return timestamp
 
-
-def read_water_level_file(fn, fmt):
-    """
-    Parse water level file using supplied datetime format
-
-    Parameters
-    ----------
-    fn : str
-        water level file
-    fmt : str
-        datetime format
-
-    Returns
-    -------
-    pd.DataFrame
-        content of water level file
-
-    """
-    date_parser = lambda x: datetime.datetime.strptime(x, fmt)
-    df = pd.read_csv(
-        fn,
-        parse_dates=True,
-        index_col=[0],
-        sep=" ",
-        date_parser=date_parser,
-        header=None,
-        names=["water_level"]
-    )
-    return df
-
-# Define the function to process a single file
-
-def get_water_level(
-    timestamp,
-    file_fmt,
-    datetime_fmt,
-    allowed_dt=None,
-):
-    """
-    Get water level from file(s)
-
-    Parameters
-    ----------
-    timestamp : datetime
-        timestamp to seek in water level file(s)
-    file_fmt : str
-        water level file template with possible datetime format in between {}
-    datetime_fmt : str
-        datetime format used inside water level files
-    allowed_dt : float
-        maximum difference between closest water level and video timestamp
-
-    Returns
-    -------
-    float
-        water level
-    """
-    if "{" in file_fmt and "}" in file_fmt:
-        datetimefmt = file_fmt.split("{")[1].split("}")[0]
-        water_level_template = file_fmt.replace(datetimefmt, ":s")
-        water_level_fn = water_level_template.format(timestamp.strftime(datetimefmt))
-    else:
-        # there is no date pattern, so assume the fmt is already a file path
-        water_level_fn = file_fmt
-    if not(os.path.isfile(water_level_fn)):
-        raise IOError(f"water level file {os.path.abspath(water_level_fn)} does not exist.")
-    df = read_water_level_file(water_level_fn, fmt=datetime_fmt)
-    t = timestamp.strftime("%Y%m%d %H:%M:%S")
-    # find the closest match
-    i = np.minimum(np.maximum(df.index.searchsorted(t), 0), len(df) - 1)
-    # check if value is within limits of time allowed
-    if allowed_dt is not None:
-        dt_seconds = abs(df.index[i] - timestamp).total_seconds()
-        if dt_seconds > allowed_dt:
-            raise ValueError(
-                f"Timestamp of video {timestamp} is more than {allowed_dt} seconds off from closest "
-                f"water level timestamp {df.index[i]}"
-            )
-    h_a = df.iloc[i].values[0]
-    return h_a
 
 def create_task(
     task_form_template,

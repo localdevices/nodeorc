@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 from io import BytesIO, StringIO
 from nodeorc import models, utils, log
-from nodeorc.db.models import Base
+from nodeorc.db.models import BaseConfig
 
 
 def prep_video_sample(video_sample_url, storage):
@@ -369,7 +369,7 @@ def config(
 def session():
     engine = create_engine(f"sqlite://")
     # make the models
-    Base.metadata.create_all(engine)
+    BaseConfig.metadata.create_all(engine)
     Session = sessionmaker()
     Session.configure(bind=engine)
     return Session()
