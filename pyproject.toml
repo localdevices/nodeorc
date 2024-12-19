@@ -39,7 +39,8 @@ dynamic = ['version', 'description']
 test = [
     "pytest",
     "pytest-cov",
-    "pytest-lazy-fixtures"
+    "pytest-lazy-fixtures",
+    "pytest-mock"
 ]
 
 [project.urls]
