@@ -1,4 +1,5 @@
 """Unit tests for database models."""
+import datetime
 import json
 import pytest
 from nodeorc.db.models import WaterLevel, WaterLevelTimeSeries, BaseData, Callback
@@ -19,6 +20,7 @@ def session():
     session.close()
     engine.dispose()
 
+
 @pytest.fixture
 def callback_instance():
     """Fixture to create a sample Callback instance."""
@@ -27,9 +29,6 @@ def callback_instance():
         body=json.dumps({"key": "value"}),
         created_at="2023-10-18T14:00:00"
     )
-
-import datetime
-
 
 
 def test_water_level_datetime_format_valid():

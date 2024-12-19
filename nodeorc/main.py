@@ -258,6 +258,43 @@ def upload_config(json_file, set_as_active):
     rec = config.add_config(session, config=config_, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
+@click.command(
+    short_help="Upload a new water level script to NodeORC database",
+)
+@click.option(
+    "-s",
+    "--script",
+    type=click.Path(exists=True),
+    help="location of the script file",
+    required=True
+)
+@click.option(
+    "-f",
+    "--file-template",
+    type=str,
+    default="wl_{%Y%m%d}.txt",
+    help="file template with optional datetime format between curly braces {}",
+)
+@click.option(
+    "-fr",
+    "--frequency",
+    type=float,
+    help="frequency of the script execution in seconds",
+    default=600,
+    show_default=True,
+    required=True
+)
+@click.option(
+    "-dt",
+    "--datetime-fmt",
+    type=str,
+    default="%Y-%m-%dT%H:%M:%SZ",
+    help="datetime format of datetime indexes in the water level files",
+    show_default=True,
+)
+def upload_water_level_script(script, file_template, frequency, datetime_fmt):
+    pass
+
 # def main():
 #     connection = pika.BlockingConnection(
 #         pika.URLParameters(
