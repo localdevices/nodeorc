@@ -1,8 +1,10 @@
-from .models import LocalConfig, RemoteConfig
 import json
-from . import db
-
 import sqlalchemy
+
+from typing import Optional, Literal
+
+from nodeorc import db
+from nodeorc.models import LocalConfig, RemoteConfig
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
@@ -59,9 +61,7 @@ def add_replace_active_config(
         storage_record=None,
         callback_url_record=None
 ):
-    """
-    Set config as the currently active config
-    """
+    """Set config as the currently active config."""
     active_configs = session.query(db.models.ActiveConfig)
     if len(active_configs.all()) == 0:
         # check if all records are present
@@ -96,6 +96,72 @@ def add_replace_active_config(
         # session.add(active_config_record)
     session.commit()
     return active_config_record
+
+from sqlalchemy.orm import Session
+from nodeorc.db.models import WaterLevel
+
+
+def add_replace_water_level_script(
+    session: Session,
+    script: Optional[str] = None,
+    script_type: Optional[Literal["python", "bash"]] = None,
+    file_template: Optional[str] = None,
+    frequency: Optional[float] = None,
+    datetime_fmt: Optional[str] = None
+):
+    """
+    Creates a new WaterLevel record, or updates an existing one, using SQLAlchemy.
+
+    Parameters
+    ----------
+    session : Session
+        Active SQLAlchemy database session
+    script : str, optional
+        content of the script to save in WaterLevel
+    script_type : str, optional ["python", "bash"]
+        Type of script
+    file_template : str, optional
+        template of the file to associate with the record, possibly containing datetime placeholder in curly braces
+    frequency: float, optional
+        water level update frequency (seconds). New water levels will be retrieved every `frequency` seconds.
+    datetime_fmt: str
+        datetime format for parsing timestamps, e.g. "%Y-%m-%dT%H:%M:%SZ"
+    """
+    try:
+        # Query for an existing WaterLevel record, if already existing, replace
+        water_level = session.query(WaterLevel).first()
+        if water_level:
+            # If the record exists, update its fields with the new information
+            water_level.script = script if script else water_level.script
+            water_level.script_type = script_type if script_type else water_level.script_type
+            water_level.file_template = file_template if file_template else water_level.file_template
+            water_level.frequency = frequency if frequency else water_level.frequency
+            water_level.datetime_fmt = datetime_fmt if datetime_fmt else water_level.datetime_fmt
+            session.commit()  # Commit the updated record to the database
+            print(f"Updated existing WaterLevel record with ID: {water_level.id}")
+        else:
+            # If no record exists, create a new one
+            water_level_data = {
+                key: value for key, value in {
+                    "script": script,
+                    "script_type": script_type,
+                    "file_template": file_template,
+                    "frequency": frequency,
+                    "datetime_fmt": datetime_fmt,
+                }.items() if value is not None
+            }
+            water_level = WaterLevel(
+                **water_level_data
+            )
+            session.add(water_level)  # Add the new record to the session
+            session.commit()  # Commit the new record to the database
+            print(f"Created new WaterLevel record with ID: {water_level.id}")
+        return water_level
+    except Exception as e:
+        # Rollback the session in case of an error to prevent breaking the database state
+        session.rollback()
+        raise ValueError(f"Error occurred: {e}")
+
 
 
 def get_settings(session, id):

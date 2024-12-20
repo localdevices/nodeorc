@@ -1,6 +1,5 @@
 """water level read utilities."""
 
-from datetime import datetime, UTC
 import pandas as pd
 import numpy as np
 import os
@@ -8,6 +7,8 @@ import re
 import sys
 import subprocess
 
+from datetime import datetime
+from typing import Literal
 
 def check_script_security(script_content):
     """
@@ -71,7 +72,10 @@ def check_script_security(script_content):
     }
 
 
-def execute_water_level_script(script_path, dt=datetime.now(UTC)):
+def execute_water_level_script(
+        script: str,
+        script_type: Literal["bash", "python"] = "bash"
+):
     """Execute a Python or bash script and retrieve the last line of its output as the result.
 
     The result is expected to be a comma-separated string containing a datetime string
@@ -79,8 +83,11 @@ def execute_water_level_script(script_path, dt=datetime.now(UTC)):
 
     Parameters
     ----------
-    script_path : str
-        Path to the Python or bash script to execute.
+    script : str
+        script content (python or bash) to execute. Script must produce a line of output in the format
+        %Y-%m-%dT%H:%M:%SZ,<float_value>
+    script_type : str, optional {'bash', 'python'}
+        by default "bash"
     dt : datetime, optional
         datetime to be passed to the script as mandatory argument, by default datetime.now(UTC)
 
@@ -97,20 +104,21 @@ def execute_water_level_script(script_path, dt=datetime.now(UTC)):
         If the script execution fails.
     """
     try:
-        if script_path.endswith(".py"):
-
+        if script_type == "python":
             output = subprocess.check_output(
-                [sys.executable, os.path.abspath(script_path), dt.strftime("%Y-%m-%dT%H:%M:%SZ")],
+                [sys.executable, "-c", script],
                 text=True
             )
+            last_line = output.strip().splitlines()[-1]
         else:
             output = subprocess.check_output(
-                [os.path.abspath(script_path), dt.strftime("%Y-%m-%dT%H:%M:%SZ")],
+                script,
+                # [os.path.abspath(script_path), dt.strftime("%Y-%m-%dT%H:%M:%SZ")],
                 shell=True,
-                stderr=subprocess.STDOUT,
-                text=True
+                # stderr=subprocess.STDOUT,
+                # text=True
             )
-        last_line = output.strip().splitlines()[-1]
+            last_line = output.decode(encoding="utf-8").strip().splitlines()[-1]
         datetime_str, float_str = last_line.split(",")
         # Validate datetime format
         datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")

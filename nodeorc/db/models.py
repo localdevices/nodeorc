@@ -7,7 +7,7 @@ import re
 import socket
 import uuid
 
-from sqlalchemy import Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
+from sqlalchemy import event, Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
 from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base, validates
 
 from nodeorc import models, water_level
@@ -260,7 +260,7 @@ class WaterLevel(BaseConfig):
     __tablename__ = "water_level"
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
-    datetimefmt = Column(
+    datetime_fmt = Column(
         String,
         default="%Y-%m-%dT%H:%M:%SZ",
         comment="Datestring format of water level file, e.g. %Y-%m-%dT%H:%M:%SZ"
@@ -272,11 +272,16 @@ class WaterLevel(BaseConfig):
                 "levels. Files are only used as fallback if there is no entry in the database. "
                 "e.g. wl_{%Y%m%d}.txt. Water level files are expected in <nodeorc home folder>/water_level/"
     )
-    retrieval_frequency = Column(
+    frequency = Column(
         Float,
         default=600,
         comment="Frequency [s] in which a device or API will be checked for available water level files and "
                 "water level entries will be added to the database, using the scripts. "
+    )
+    script_type = Column(
+        Enum("python", "bash"),
+        default="bash",
+        comment="Type of script used to retrieve water level data from the device or API. Either 'python' or 'bash'."
     )
     script = Column(
         String,
@@ -290,12 +295,17 @@ class WaterLevel(BaseConfig):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-    @validates('datetimefmt')
+    @validates('datetime_fmt')
     def validate_datetime_format(self, key, value):
         """Validate that the provided string is a valid datetime format string."""
+        if not "%" in value:
+            raise ValueError("Invalid datetime format string: % is missing.")
         try:
             # Test the format using strptime with a sample date
-            datetime.datetime.strptime('2000-01-01T00:00:00Z', value)
+            _ = datetime.datetime.strptime(
+                datetime.datetime.now().strftime(value),
+                value
+            )
         except ValueError:
             raise ValueError(f"Invalid datetime format string: {value}")
         return value
@@ -319,29 +329,34 @@ class WaterLevel(BaseConfig):
             raise ValueError(f"Invalid datetime format in '{{{datetime_format}}}'.")
         return value
 
-    @validates('retrieval_frequency')
-    def validate_retrieval_frequency(self, key, value):
+    @validates('frequency')
+    def validate_frequency(self, key, value):
         if value is None or value <= 0:
             raise ValueError("retrieval_frequency must be a positive value.")
         if value > 86400:
             raise ValueError("retrieval_frequency must be less than 86400 (i.e. at least once per day).")
         return value
 
-    @validates('script')
-    def validate_script(self, key, script_value):
-        """
-        Validates the script column by running the provided script using the function
-        `nodeorc.water_level.execute_water_level_script` and checking its output.
-        """
+
+@event.listens_for(WaterLevel, "before_insert")
+@event.listens_for(WaterLevel, "before_update")
+def validate_script(mapper, connection, target):
+    """
+    Validates the script column by running the provided script using the function
+    `nodeorc.water_level.execute_water_level_script` and checking its output.
+    """
+    if not isinstance(target.script, str):
+        raise ValueError("script must be a string.")
+    if target.script:
         try:
             # Execute the script and capture its output
-            _ = water_level.execute_water_level_script(script_value)
+            _ = water_level.execute_water_level_script(target.script, target.script_type)
         except Exception as e:
             raise ValueError(
-                f"Error while validating script '{script_value}': {str(e)}"
+                f"Error while validating script: {str(e)}"
             )
-        # If valid, return the script_value
-        return script_value
+        # # If valid, return the script_value
+        # return script_value
 
 
 class ActiveConfig(BaseConfig):

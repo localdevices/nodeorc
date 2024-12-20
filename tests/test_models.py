@@ -2,11 +2,23 @@
 import datetime
 import json
 import pytest
-from nodeorc.db.models import WaterLevel, WaterLevelTimeSeries, BaseData, Callback
 import nodeorc.models as orcmodels
+
+from nodeorc.db.models import WaterLevel, WaterLevelTimeSeries, BaseData, Callback
+from nodeorc.config import add_replace_water_level_script
+
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
+
+@pytest.fixture
+def session_config():
+    engine = create_engine('sqlite:///:memory:')
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    WaterLevel.metadata.create_all(engine)
+    yield session
+    session.close()
 
 
 # Setup test database
@@ -29,6 +41,117 @@ def callback_instance():
         body=json.dumps({"key": "value"}),
         created_at="2023-10-18T14:00:00"
     )
+
+@pytest.fixture
+def script():
+    """Fixture to create a sample script that generates a datetime and value for a water level."""
+    return "echo \"2023-01-01T00:00:00Z, 1.23\""
+
+@pytest.fixture
+def python_script():
+    """Fixture to create a sample python script (instead of bash) for water level retrieval."""
+    return "print(\"2023-01-01T00:00:00Z, 1.23\")"
+
+
+
+@pytest.fixture
+def new_script():
+    """Fixture to create a replacement sample script for water level retrieval."""
+    return "echo \"2024-01-01T00:00:00Z, 1.23\""
+
+
+# test configs
+def test_add_new_water_level_record(session_config, script):
+    file_template = "file_{datetime}.txt"
+    frequency = 10.5
+    datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
+
+    water_level = add_replace_water_level_script(
+        session=session_config,
+        script=script,
+        file_template=file_template,
+        frequency=frequency,
+        datetime_fmt=datetime_fmt,
+    )
+
+    assert water_level is not None
+    assert water_level.script == script
+    assert water_level.file_template == file_template
+    assert water_level.frequency == frequency
+    assert water_level.datetime_fmt == datetime_fmt
+
+def test_add_new_water_level_record_python(session_config, python_script):
+    file_template = "file_{datetime}.txt"
+    script_type = 'python'
+    frequency = 10.5
+    datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
+
+    water_level = add_replace_water_level_script(
+        session=session_config,
+        script=python_script,
+        script_type=script_type,
+        file_template=file_template,
+        frequency=frequency,
+        datetime_fmt=datetime_fmt,
+    )
+
+    assert water_level is not None
+    assert water_level.script == python_script
+    assert water_level.file_template == file_template
+    assert water_level.frequency == frequency
+    assert water_level.datetime_fmt == datetime_fmt
+
+
+
+def test_update_existing_water_level_record(session_config, script, new_script):
+    file_template = "file_{datetime}.txt"
+    frequency = 10.5
+    datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
+
+    # Add initial record
+    water_level = WaterLevel(
+        script=script,
+        file_template=file_template,
+        frequency=frequency,
+        datetime_fmt=datetime_fmt,
+    )
+    session_config.add(water_level)
+    session_config.commit()
+
+    # Update record
+    new_file_template = "updated_file_{datetime}.txt"
+    new_frequency = 20.0
+    new_datetime_fmt = "%d-%m-%YT%H:%M:%S"
+
+    updated_water_level = add_replace_water_level_script(
+        session=session_config,
+        script=new_script,
+        file_template=new_file_template,
+        frequency=new_frequency,
+        datetime_fmt=new_datetime_fmt,
+    )
+
+    assert updated_water_level is not None
+    assert updated_water_level.script == new_script
+    assert updated_water_level.file_template == new_file_template
+    assert updated_water_level.frequency == new_frequency
+    assert updated_water_level.datetime_fmt == new_datetime_fmt
+
+
+def test_rollback_on_error(session_config, script):
+    file_template = "file_{datetime}.txt"
+    frequency = 10.5
+    datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
+
+    # Simulate a failure by passing an invalid parameter
+    with pytest.raises(Exception):
+        add_replace_water_level_script(
+            session_config, 20 # , file_template, frequency, datetime_fmt
+        )
+
+    # Ensure no records were added
+    result = session_config.query(WaterLevel).all()
+    assert len(result) == 0
 
 
 def test_water_level_datetime_format_valid():

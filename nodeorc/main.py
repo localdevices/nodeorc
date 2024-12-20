@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # import tasks
 
 # import nodeorc specifics
-from . import db, log, models, config, tasks, settings_path, __version__
+from nodeorc import db, log, models, config, tasks, settings_path, __version__
 
 
 session = db.session
@@ -81,6 +81,18 @@ def validate_storage(ctx, param, value):
     elif "remote":
         # storage is defined by remote task so not relevant now
         pass
+    return value
+
+def load_script(ctx, param, value):
+    with open(value, "r") as f:
+        script = f.read()
+    return script
+
+def validate_frequency(ctx, param, value):
+    if value < 60:
+        raise click.BadParameter("Frequency must be at least 60 seconds (i.e. 1 minute)")
+    if value > 86400:
+        raise click.BadParameter("Frequency must be at most 86400 seconds (i.e. 1 day)")
     return value
 
 
@@ -264,10 +276,19 @@ def upload_config(json_file, set_as_active):
 @click.option(
     "-s",
     "--script",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    callback=load_script,
     help="location of the script file",
     required=True
 )
+@click.option(
+    "-t",
+    "--script-type",
+    type=click.Choice(["python", "bash"]),
+    default="bash",
+    help="Script type (either 'python' or 'bash')",
+)
+
 @click.option(
     "-f",
     "--file-template",
@@ -282,7 +303,8 @@ def upload_config(json_file, set_as_active):
     help="frequency of the script execution in seconds",
     default=600,
     show_default=True,
-    required=True
+    required=True,
+    callback=validate_frequency
 )
 @click.option(
     "-dt",
@@ -292,8 +314,22 @@ def upload_config(json_file, set_as_active):
     help="datetime format of datetime indexes in the water level files",
     show_default=True,
 )
-def upload_water_level_script(script, file_template, frequency, datetime_fmt):
-    pass
+def upload_water_level_script(script, script_type, file_template, frequency, datetime_fmt):
+    logger.info(f"Device {str(device)} receiving new water level script configuration. Script must provide ")
+    logger.info(
+        "valid outputs. If API is called, ensure a valid response is returned and you are connected to internet."
+    )
+
+    rec = config.add_replace_water_level_script(
+        session,
+        script,
+        script_type,
+        file_template,
+        frequency,
+        datetime_fmt
+    )
+    logger.info(f"Settings updated successfully to {rec}")
+
 
 # def main():
 #     connection = pika.BlockingConnection(

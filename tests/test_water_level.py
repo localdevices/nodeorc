@@ -73,15 +73,12 @@ def test_execute_script_real_file(script="dummy_script.sh"):
 
 @pytest.mark.parametrize(
     "script", [
-        # "g_red_api_request.sh",
         "get_waterlevel_limburg.py"
     ]
 )
 def test_execute_script_gred(script):
     import os
     dt = datetime.datetime(year=2024, month=11, day=30, hour=0, minute=30, tzinfo=datetime.timezone.utc)
-    os.environ["GRED_EMAIL"] = "winsemius@rainbowsensing.com"
-    os.environ["GRED_PASSWORD"] = "Zu2CzKbBKjDCe9G"
     print(os.path.abspath(script))
     result = execute_water_level_script(script, dt=dt)
     print(result)
