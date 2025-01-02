@@ -7,10 +7,12 @@ from dotenv import load_dotenv
 # import tasks
 
 # import nodeorc specifics
-from nodeorc import db, log, models, config, tasks, settings_path, __version__
+from nodeorc import db, log, models, config, tasks, settings_path, utils, __version__
 
+def get_session():
+    return db.session
 
-session = db.session
+session = get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
 active_config = config.get_active_config(parse=True)
 if active_config:
@@ -183,6 +185,7 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 # @listen_opt
 def start():
     # get the device id
+    session = get_session()
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     # if listen == "local" and storage == "remote":
@@ -190,15 +193,22 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = config.get_active_config(parse=True)
+    active_config = config.get_active_config(session=session, parse=True)
     if not(active_config):
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
             'through the CLI. Type "nodeorc upload-config --help" for more information'
         )
-
+    water_level_config = config.get_water_level_config(session=session)
+    if not(water_level_config):
+        raise click.UsageError(
+            'You do not yet have a water level configuration. Upload a water level retrieval '
+            'script through the CLI. Type "nodeorc upload-water-level-script --help" for more information'
+        )
+    else:
+        water_level_config = utils.model_to_dict(water_level_config)
     # initialize the database for storing data
-    session_data = db.init_basedata.get_data_session()
+    # session_data = db.init_basedata.get_data_session()
     # read the task form from the configuration
     task_form_template = config.get_active_task_form(session, parse=True)
     callback_url = active_config.callback_url
@@ -212,6 +222,8 @@ def start():
             logger=logger,
             reboot_after=active_config.settings.reboot_after
         )
+        # this return never happens, unless isolated unit tests are run
+        return 0
     else:
         # check for a new form with one single request
         logger.info("Checking if a new task form is available for me...")
@@ -240,6 +252,7 @@ def start():
             task_form_template=task_form_template,
             logger=logger,
             **active_config.model_dump()
+            **water_level_config,
         )
         processor.await_task()
     except Exception as e:

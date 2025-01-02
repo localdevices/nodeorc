@@ -4,7 +4,7 @@ import json
 import pytest
 import nodeorc.models as orcmodels
 
-from nodeorc.db.models import WaterLevel, WaterLevelTimeSeries, BaseData, Callback
+from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
 from nodeorc.config import add_replace_water_level_script
 
 from sqlalchemy import create_engine
@@ -12,25 +12,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 @pytest.fixture
-def session_config():
+def session():
     engine = create_engine('sqlite:///:memory:')
     Session = sessionmaker(bind=engine)
-    session = Session()
-    WaterLevel.metadata.create_all(engine)
-    yield session
-    session.close()
-
-
-# Setup test database
-@pytest.fixture
-def session():
-    engine = create_engine("sqlite:///:memory:")
-    BaseData.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    engine.dispose()
+    s = Session()
+    Base.metadata.create_all(engine)
+    yield s
+    s.close()
 
 
 @pytest.fixture
@@ -61,13 +49,13 @@ def new_script():
 
 
 # test configs
-def test_add_new_water_level_record(session_config, script):
+def test_add_new_water_level_record(session, script):
     file_template = "file_{datetime}.txt"
     frequency = 10.5
     datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
 
     water_level = add_replace_water_level_script(
-        session=session_config,
+        session=session,
         script=script,
         file_template=file_template,
         frequency=frequency,
@@ -80,14 +68,14 @@ def test_add_new_water_level_record(session_config, script):
     assert water_level.frequency == frequency
     assert water_level.datetime_fmt == datetime_fmt
 
-def test_add_new_water_level_record_python(session_config, python_script):
+def test_add_new_water_level_record_python(session, python_script):
     file_template = "file_{datetime}.txt"
     script_type = 'python'
     frequency = 10.5
     datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
 
     water_level = add_replace_water_level_script(
-        session=session_config,
+        session=session,
         script=python_script,
         script_type=script_type,
         file_template=file_template,
@@ -103,20 +91,20 @@ def test_add_new_water_level_record_python(session_config, python_script):
 
 
 
-def test_update_existing_water_level_record(session_config, script, new_script):
+def test_update_existing_water_level_record(session, script, new_script):
     file_template = "file_{datetime}.txt"
     frequency = 10.5
     datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
 
     # Add initial record
-    water_level = WaterLevel(
+    water_level = WaterLevelSettings(
         script=script,
         file_template=file_template,
         frequency=frequency,
         datetime_fmt=datetime_fmt,
     )
-    session_config.add(water_level)
-    session_config.commit()
+    session.add(water_level)
+    session.commit()
 
     # Update record
     new_file_template = "updated_file_{datetime}.txt"
@@ -124,7 +112,7 @@ def test_update_existing_water_level_record(session_config, script, new_script):
     new_datetime_fmt = "%d-%m-%YT%H:%M:%S"
 
     updated_water_level = add_replace_water_level_script(
-        session=session_config,
+        session=session,
         script=new_script,
         file_template=new_file_template,
         frequency=new_frequency,
@@ -138,7 +126,7 @@ def test_update_existing_water_level_record(session_config, script, new_script):
     assert updated_water_level.datetime_fmt == new_datetime_fmt
 
 
-def test_rollback_on_error(session_config, script):
+def test_rollback_on_error(session, script):
     file_template = "file_{datetime}.txt"
     frequency = 10.5
     datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -146,64 +134,67 @@ def test_rollback_on_error(session_config, script):
     # Simulate a failure by passing an invalid parameter
     with pytest.raises(Exception):
         add_replace_water_level_script(
-            session_config, 20 # , file_template, frequency, datetime_fmt
+            session, 20 # , file_template, frequency, datetime_fmt
         )
 
     # Ensure no records were added
-    result = session_config.query(WaterLevel).all()
+    result = session.query(WaterLevelSettings).all()
     assert len(result) == 0
 
 
 def test_water_level_datetime_format_valid():
-    water_level = WaterLevel(datetimefmt="%Y-%m-%dT%H:%M:%SZ")
-    assert water_level.datetimefmt == "%Y-%m-%dT%H:%M:%SZ"
+    water_level = WaterLevelSettings(datetime_fmt="%Y-%m-%dT%H:%M:%SZ")
+    assert water_level.datetime_fmt == "%Y-%m-%dT%H:%M:%SZ"
 
 
 def test_water_level_datetime_format_invalid():
     with pytest.raises(ValueError, match="Invalid datetime format string: .*"):
-        WaterLevel(datetimefmt="invalid_format")
+        WaterLevelSettings(datetime_fmt="invalid_format")
 
 
 def test_water_level_file_template_valid():
-    water_level = WaterLevel(file_template="wl_{%d%m%Y}.txt")
+    water_level = WaterLevelSettings(file_template="wl_{%d%m%Y}.txt")
     assert water_level.file_template == "wl_{%d%m%Y}.txt"
 
 
 def test_water_level_file_template_invalid_no_braces():
-    water_level = WaterLevel(file_template="valid_single_file.txt")
+    water_level = WaterLevelSettings(file_template="valid_single_file.txt")
     assert water_level.file_template == "valid_single_file.txt"
 
 
 def test_water_level_file_template_invalid_format():
     with pytest.raises(ValueError, match="Invalid datetime format in .*"):
-        WaterLevel(file_template="wl_{%Q}.txt")
+        WaterLevelSettings(file_template="wl_{%Q}.txt")
 
 
 def test_water_level_retrieval_frequency_valid():
-    water_level = WaterLevel(retrieval_frequency=300)
-    assert water_level.retrieval_frequency == 300
+    water_level = WaterLevelSettings(frequency=300)
+    assert water_level.frequency == 300
 
 
 def test_water_level_retrieval_frequency_negative():
-    with pytest.raises(ValueError, match="retrieval_frequency must be a positive value."):
-        WaterLevel(retrieval_frequency=-1)
+    with pytest.raises(ValueError, match="frequency must be a positive value."):
+        WaterLevelSettings(frequency=-1)
 
 
 def test_water_level_retrieval_frequency_too_high():
-    with pytest.raises(ValueError, match="retrieval_frequency must be less than 86400 .*"):
-        WaterLevel(retrieval_frequency=90000)
+    with pytest.raises(ValueError, match="frequency must be less than 86400 .*"):
+        WaterLevelSettings(frequency=90000)
 
 
 def test_water_level_script_valid(mocker):
     mocker.patch("nodeorc.water_level.execute_water_level_script", return_value="2023-01-01T00:00:00Z, 1.23")
-    water_level = WaterLevel(script="valid_script.py")
+    water_level = WaterLevelSettings(script="valid_script.py")
     assert water_level.script == "valid_script.py"
 
 
-def test_water_level_script_invalid(mocker):
+def test_water_level_script_invalid(session, mocker):
     mocker.patch("nodeorc.water_level.execute_water_level_script", side_effect=Exception("Script execution failed"))
-    with pytest.raises(ValueError, match="Error while validating script .*"):
-        WaterLevel(script="invalid_script.py")
+    with pytest.raises(ValueError, match="Error while validating script: *"):
+        instance = WaterLevelSettings(script="invalid_script.py")
+        session.add(instance)
+        session.commit()
+
 
 
 def test_water_level_ts_creation(session):

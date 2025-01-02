@@ -36,16 +36,11 @@ class DeviceFormStatus(enum.Enum):
     BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
 
 
-# database components for configuration, remains static during most of the time, unless
-# an update needs to be processed.
-BaseConfig = declarative_base()
-
-# database components for storing incremental data, records are added with each video
-# and callback, but database can safely be removed, e.g. when disk is full.
-BaseData = declarative_base()
+# database set up
+Base = declarative_base()
 
 
-class Device(BaseConfig):
+class Device(Base):
     __tablename__ = "device"
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
@@ -58,7 +53,7 @@ class Device(BaseConfig):
     )
     created_at = Column(
         DateTime,
-        default=datetime.datetime.utcnow,
+        default=datetime.datetime.now(datetime.UTC),
         nullable=False
     )
     operating_system = Column(
@@ -107,11 +102,11 @@ class Device(BaseConfig):
         return device_info
 
 
-class Settings(BaseConfig):
+class Settings(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
     parse_dates_from_file = Column(
         Boolean,
         default=True,
@@ -125,17 +120,17 @@ class Settings(BaseConfig):
         comment="Filename template (excluding path) defining the file name convention of video files. The template "
                 "contains a datestring format in between {} signs, e.g. video_{%Y%m%dT%H%M%S}.mp4"
     )
-    water_level_fmt = Column(
-        String,
-        comment="Filename template (excluding path) defining the file name convention of files containing water "
-                "levels. The template contains a datestring format in between {} signs, "
-                "e.g. wl_{%Y%m%d}.txt. Water level files are expected in <nodeorc home folder>/water_level/"
-    )
-    water_level_datetimefmt = Column(
-        String,
-        comment="Datestring format of water level file, e.g. %Y-%m-%dT%H:%M:%S"
-
-    )
+    # water_level_fmt = Column(
+    #     String,
+    #     comment="Filename template (excluding path) defining the file name convention of files containing water "
+    #             "levels. The template contains a datestring format in between {} signs, "
+    #             "e.g. wl_{%Y%m%d}.txt. Water level files are expected in <nodeorc home folder>/water_level/"
+    # )
+    # water_level_datetimefmt = Column(
+    #     String,
+    #     comment="Datestring format of water level file, e.g. %Y-%m-%dT%H:%M:%S"
+    #
+    # )
     allowed_dt = Column(
         Float,
         default=3600,
@@ -163,11 +158,11 @@ class Settings(BaseConfig):
         return "{}".format(self.__str__())
 
 
-class DiskManagement(BaseConfig):
+class DiskManagement(Base):
     __tablename__ = 'disk_management'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
     home_folder = Column(
         String,
         default="/home",
@@ -197,11 +192,11 @@ class DiskManagement(BaseConfig):
         return "{}".format(self.__str__())
 
 
-class CallbackUrl(BaseConfig):
+class CallbackUrl(Base):
     __tablename__ = 'callback_url'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
     server_name = Column(
         String,
         comment="User defined recognizable name for server"
@@ -235,11 +230,11 @@ class CallbackUrl(BaseConfig):
         return "{}".format(self.__str__())
 
 
-class Storage(BaseConfig):
+class Storage(Base):
     __tablename__ = "storage"
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
     url = Column(
         String,
         default="./tmp",
@@ -256,7 +251,7 @@ class Storage(BaseConfig):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-class WaterLevel(BaseConfig):
+class WaterLevelSettings(Base):
     __tablename__ = "water_level"
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
@@ -332,19 +327,22 @@ class WaterLevel(BaseConfig):
     @validates('frequency')
     def validate_frequency(self, key, value):
         if value is None or value <= 0:
-            raise ValueError("retrieval_frequency must be a positive value.")
+            raise ValueError("frequency must be a positive value.")
         if value > 86400:
-            raise ValueError("retrieval_frequency must be less than 86400 (i.e. at least once per day).")
+            raise ValueError("frequency must be less than 86400 (i.e. at least once per day).")
         return value
 
 
-@event.listens_for(WaterLevel, "before_insert")
-@event.listens_for(WaterLevel, "before_update")
+@event.listens_for(WaterLevelSettings, "before_insert")
+@event.listens_for(WaterLevelSettings, "before_update")
 def validate_script(mapper, connection, target):
     """
     Validates the script column by running the provided script using the function
     `nodeorc.water_level.execute_water_level_script` and checking its output.
     """
+    if target.script is None:
+        # use default script instead
+        return
     if not isinstance(target.script, str):
         raise ValueError("script must be a string.")
     if target.script:
@@ -355,11 +353,9 @@ def validate_script(mapper, connection, target):
             raise ValueError(
                 f"Error while validating script: {str(e)}"
             )
-        # # If valid, return the script_value
-        # return script_value
 
 
-class ActiveConfig(BaseConfig):
+class ActiveConfig(Base):
     __tablename__ = "active_config"
     id = Column(Integer, primary_key=True)
     settings_id = Column(Integer, ForeignKey("settings.id"), nullable=False, comment="general settings of local paths, formats and device behaviour.")
@@ -389,18 +385,18 @@ class ActiveConfig(BaseConfig):
         return "{}".format(self.__str__())
 
 
-class TaskForm(BaseConfig):
+class TaskForm(Base):
     __tablename__ = "task_form"
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True
     )
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
     status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
     task_body = Column(JSON)
     message = Column(String, nullable=True)  # error message if any
 
 
-class Callback(BaseData):
+class Callback(Base):
     __tablename__ = "callback"
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
@@ -418,7 +414,7 @@ class Callback(BaseData):
         return models.Callback(**body)
 
 
-class WaterLevelTimeSeries(BaseData):
+class WaterLevelTimeSeries(Base):
     """
     Represents water level data with timestamp and value.
 

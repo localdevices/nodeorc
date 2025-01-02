@@ -3,7 +3,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import BaseConfig, BaseData, Device
+from .models import Base, Device
 from . import active_config
 from .. import __home__
 
@@ -13,13 +13,11 @@ db_path_config = os.path.join(
 engine_config = create_engine(f"sqlite:///{db_path_config}")
 
 # make the models
-BaseConfig.metadata.create_all(engine_config)
+Base.metadata.create_all(engine_config)
 
 Session = sessionmaker()
 Session.configure(bind=engine_config)
 session = Session()
-
-from . import init_basedata
 
 # if no device id is present, then create one
 device_query = session.query(Device)

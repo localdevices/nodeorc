@@ -113,10 +113,7 @@ def execute_water_level_script(
         else:
             output = subprocess.check_output(
                 script,
-                # [os.path.abspath(script_path), dt.strftime("%Y-%m-%dT%H:%M:%SZ")],
                 shell=True,
-                # stderr=subprocess.STDOUT,
-                # text=True
             )
             last_line = output.decode(encoding="utf-8").strip().splitlines()[-1]
         datetime_str, float_str = last_line.split(",")

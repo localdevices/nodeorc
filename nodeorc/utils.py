@@ -3,6 +3,7 @@ import os
 import logging
 import time
 
+from sqlalchemy import inspect
 
 def check_bucket(s3, bucket_name):
     try:
@@ -106,3 +107,7 @@ def reboot_now():
     # in case this fails, do a sudo shutdown
     os.system("/bin/sudo /sbin/shutdown -r now")
     os.system("/usr/bin/sudo /sbin/shutdown -r now")
+
+
+def model_to_dict(model_instance):
+    return {c.key: getattr(model_instance, c.key) for c in inspect(model_instance).mapper.column_attrs}

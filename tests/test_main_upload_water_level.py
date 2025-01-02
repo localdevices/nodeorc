@@ -1,15 +1,12 @@
-# File: tests/test_main2.py
-
+"""Unit test for the CLI commands."""
 import os
-import time
 
-import pytest
 from click.testing import CliRunner
 from nodeorc.main import upload_water_level_script
-from nodeorc.db.models import WaterLevel
+from nodeorc.db.models import WaterLevelSettings
 from nodeorc.db import db_path_config
 
-# @pytest.fixture
+
 def get_session_config():
     from nodeorc.db import session
     return session
@@ -33,9 +30,8 @@ def test_upload_water_level_script_success(tmp_path):
         ]
     )
     # check if record was indeed added
-    record = session_config.query(WaterLevel).all()
+    record = session_config.query(WaterLevelSettings).all()
     assert len(record) == 1
-
     assert result.exit_code == 0
     assert "Created new WaterLevel record with" in result.output
     if os.path.exists(db_path_config):
@@ -52,7 +48,6 @@ def test_upload_water_level_script_missing_script():
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
         ]
     )
-
     assert result.exit_code == 2
     assert "Error: Missing option '-s' / '--script'" in result.output
     if os.path.exists(db_path_config):
@@ -75,7 +70,6 @@ def test_upload_water_level_script_invalid_file_template(tmp_path):
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
         ]
     )
-
     assert result.exit_code != 0
     assert isinstance(result.exception, ValueError)
     if os.path.exists(db_path_config):
@@ -98,7 +92,6 @@ def test_upload_water_level_script_invalid_frequency(tmp_path):
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
         ]
     )
-
     assert result.exit_code != 0
     assert "Invalid value for '-fr' / '--frequency'" in result.output
     if os.path.exists(db_path_config):
@@ -121,7 +114,6 @@ def test_upload_water_level_script_invalid_datetime_format(tmp_path):
             "--datetime-fmt", "invalid_format",
         ]
     )
-
     assert result.exit_code != 0
     assert isinstance(result.exception, ValueError)
     if os.path.exists(db_path_config):

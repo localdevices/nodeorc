@@ -28,6 +28,7 @@ class LocalTaskProcessor:
             callback_url: models.CallbackUrl,
             storage: models.Storage,
             settings: models.Settings,
+            water_level_config: dict,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
             logger=logging,
@@ -39,11 +40,12 @@ class LocalTaskProcessor:
         self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
+        self.water_level_config = water_level_config
         self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
         self.processing = False  # state for checking if any processing is going on
         self.reboot = False  # state that checks if a scheduled reboot should be done
-        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
+        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.water_level_config["file_template"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
         self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{self.settings["water_level_datetimefmt"]}')
@@ -55,6 +57,12 @@ class LocalTaskProcessor:
             target=self.await_task,
         )
         self.thread.start()
+        # add a thread for regular retrieval of water levels
+        self.water_level_thread = threading.Thread(
+            target=self.get_water_level
+        )
+        self.water_level_thread.start()
+
         try:
             # Your main program can continue running here
             while not self.event.is_set():
@@ -130,6 +138,18 @@ class LocalTaskProcessor:
                     if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
 
+    def get_water_level(self):
+        self.logger.info("Starting thread for retrieving water levels")
+        # TODO: retrieve water level parameters and only if available run this!
+        while not self.event.is_set():
+            try:
+                self.logger.info("Checking for water levels.")
+                # TODO: get the water level script runner implemented
+            except Exception as e:
+                self.logger.error(f"Error in retrieval of water levels: {e}")
+            # sleep for configured amount of seconds
+            time.sleep(self.settings["water_level_frequency"])
+        self.logger.info("Water level thread terminated.")
 
 
     def cleanup_space(self, free_space):
@@ -247,7 +267,7 @@ class LocalTaskProcessor:
                 h_a = water_level.get_water_level(
                     timestamp,
                     file_fmt=self.water_level_file_template,
-                    datetime_fmt=self.settings["water_level_datetimefmt"],
+                    datetime_fmt=self.water_level_config["datetime_fmt"],
                     allowed_dt=self.settings["allowed_dt"]
                 )
                 self.logger.info(f"Water level found with value {h_a} m.")
@@ -388,8 +408,7 @@ class LocalTaskProcessor:
         Try to post remaining non-posted callbacks and change their states in database
         if successful
         """
-        session_data = db.init_basedata.get_data_session()
-        callback_records = session_data.query(db.models.Callback)
+        callback_records = db.session.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
         success = True
@@ -410,8 +429,8 @@ class LocalTaskProcessor:
             if not(success):
                 # immediately stop the processing of callbacks
                 break
-            session_data.delete(callback_record)
-            session_data.commit()
+            db.session.delete(callback_record)
+            db.session.commit()
 
 
 def get_timestamp(

@@ -3,8 +3,8 @@ from typing import Optional, Dict, Any, List, Union
 from pydantic import field_validator, BaseModel
 
 # nodeodm specific imports
-from .. import callbacks
-from . import File, Storage
+from nodeorc import callbacks
+from nodeorc.models import File, Storage
 
 
 class Callback(BaseModel):
@@ -14,7 +14,7 @@ class Callback(BaseModel):
     file: Optional[Union[File, str]] = None  # filename specific to the used callback, if callback does not require any input file, then leave empty
     files_to_send: Optional[Union[List[str], Dict[str, File]]] = None
     request_type: str = "POST"
-    kwargs: Optional[Dict[str, Any]] = {}  # set of kwargs to add to the callback msg body
+    kwargs: Optional[Dict[str, Any]] = dict  # set of kwargs to add to the callback msg body
     endpoint: Optional[str] = "/api/timeseries/"  # used to extend the default callback url
 
     @field_validator("func_name")
@@ -32,10 +32,9 @@ class Callback(BaseModel):
         return data, files
 
     def to_db(self):
-        from .. import db  # import lazily to prevent circular imports
-        session_data = db.init_basedata.get_data_session()
+        from nodeorc import db  # import lazily to prevent circular imports
         rec = db.models.Callback(
             body=self.model_dump_json()
         )
-        session_data.add(rec)
-        session_data.commit()
+        db.session.add(rec)
+        db.session.commit()

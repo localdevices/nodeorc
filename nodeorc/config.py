@@ -39,9 +39,6 @@ def add_config(
     session.add(disk_management_record)
     session.add(storage_record)
     session.add(callback_url_record)
-
-    # config_record = db_models.Config(**config_dict)
-    # session.add(config_record)
     session.commit()
     if set_as_active:
         active_config_record = add_replace_active_config(
@@ -93,12 +90,11 @@ def add_replace_active_config(
             active_config_record.storage = storage_record
         if callback_url_record:
             active_config_record.callback_url = callback_url_record
-        # session.add(active_config_record)
     session.commit()
     return active_config_record
 
 from sqlalchemy.orm import Session
-from nodeorc.db.models import WaterLevel
+from nodeorc.db.models import WaterLevelSettings
 
 
 def add_replace_water_level_script(
@@ -129,7 +125,7 @@ def add_replace_water_level_script(
     """
     try:
         # Query for an existing WaterLevel record, if already existing, replace
-        water_level = session.query(WaterLevel).first()
+        water_level = session.query(WaterLevelSettings).first()
         if water_level:
             # If the record exists, update its fields with the new information
             water_level.script = script if script else water_level.script
@@ -150,7 +146,7 @@ def add_replace_water_level_script(
                     "datetime_fmt": datetime_fmt,
                 }.items() if value is not None
             }
-            water_level = WaterLevel(
+            water_level = WaterLevelSettings(
                 **water_level_data
             )
             session.add(water_level)  # Add the new record to the session
@@ -180,8 +176,8 @@ def get_settings(session, id):
     return session.query(db.models.Settings).get(id)
 
 
-def get_active_config(parse=False):
-    active_configs = db.session.query(db.models.ActiveConfig)
+def get_active_config(session=db.session, parse=False):
+    active_configs = session.query(db.models.ActiveConfig)
     if len(active_configs.all()) == 0:
         return None
     active_config = active_configs.first()
@@ -224,6 +220,12 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
         task_form = task_form.task_body
     return task_form
 
+def get_water_level_config(session):
+    query = session.query(WaterLevelSettings)
+    if len(query.all()) == 0:
+        # there are no task forms yet, return None
+        return None
+    return session.query(WaterLevelSettings).first()
 
 def patch_active_config_to_accepted():
     """If active config is still CANDIDATE, upgrade to ACCEPTED """

@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, UTC
 import json
 import logging
 import os
@@ -35,7 +35,7 @@ def wait_for_task_form(session, callback_url, device, timeout=300, reboot_after=
         logger of nodeorc
 
     """
-    reboot_t0 = time.time()
+    reboot_t0 = time.time() if reboot_after != 0. else float("inf")
     while True:
         # keep on trying to get a new task form from configured server until successful
         task_form = request_task_form(session, callback_url, device, logger=logger)
@@ -46,6 +46,7 @@ def wait_for_task_form(session, callback_url, device, timeout=300, reboot_after=
             # new task form found, reboot service
             logger.info("New task form setup. Reboot service...")
             os._exit(0)
+            return True
         if time.time() - reboot_t0 > reboot_after:
             logger.info(f"Rebooting device after {reboot_after} seconds")
             utils.reboot_now()
@@ -111,8 +112,8 @@ def request_remote_task_form(session, callback_url, device, logger=logging):
         url_patch = urljoin(str(callback_url.url), f"/api/device/{device.id}/patch_task_form/")
 
         headers = {"Authorization": f"Bearer {callback_url.token_access}"}
-        t_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        if datetime.utcnow() > callback_url.token_expiration:
+        t_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if datetime.now(UTC) > callback_url.token_expiration:
             logger.info("Token expired, requesting new token...")
             # first refresh tokens
             callback_url.refresh_tokens()
