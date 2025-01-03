@@ -121,7 +121,7 @@ class CallbackUrl(BaseModel):
 
         """
         # get the active configuration record
-        from .. import config  # import lazily to avoid circular referencing
+        from .. import db_ops  # import lazily to avoid circular referencing
         from ..db import session  # import lazily to avoid circular referencing
 
         active_config = config.get_active_config()

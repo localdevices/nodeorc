@@ -5,7 +5,7 @@ import pytest
 import nodeorc.models as orcmodels
 
 from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
-from nodeorc.config import add_replace_water_level_script
+from nodeorc.db_ops import add_replace_water_level_script, add_water_level
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
@@ -224,11 +224,40 @@ def test_water_level_ts_default_timestamp(session):
     assert retrieved.level == level
 
 
-def test_water_level__ts_no_level(session):
+def test_water_level_ts_no_level(session):
     with pytest.raises(IntegrityError):
         wl = WaterLevelTimeSeries()
         session.add(wl)
         session.commit()
+
+
+def test_add_water_level_already_exists(session):
+    timestamp = datetime.datetime(2023, 1, 1, 12, 0, 0)
+    level = 5.0
+    water_level = WaterLevelTimeSeries(timestamp=timestamp, level=level)
+    session.add(water_level)
+    session.commit()
+    # now test function
+    water_level_existing = add_water_level(session, timestamp, level)
+    # check total amount of time stamps
+    water_levels = session.query(WaterLevelTimeSeries).all()
+    assert len(water_levels) == 1
+    assert water_level_existing.id == water_level.id
+
+
+def test_add_water_level_new(session):
+    timestamp = datetime.datetime(2023, 1, 1, 12, 0, 0)
+    level = 5.0
+    water_level = add_water_level(session, timestamp, level)
+    # now add a new timestamp and level
+    new_timestamp = datetime.datetime(2023, 1, 1, 12, 1, 0)
+    new_level = 6.0
+    new_water_level = add_water_level(session, new_timestamp, new_level)
+    # check total amount of time stamps
+    water_levels = session.query(WaterLevelTimeSeries).all()
+    assert len(water_levels) == 2
+    # check difference
+    assert new_water_level.id != water_level.id
 
 
 def test_callback_str_method(callback_instance):

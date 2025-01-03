@@ -7,14 +7,11 @@ from dotenv import load_dotenv
 # import tasks
 
 # import nodeorc specifics
-from nodeorc import db, log, models, config, tasks, settings_path, utils, __version__
+from nodeorc import db, log, models, db_ops, tasks, settings_path, utils, __version__
 
-def get_session():
-    return db.session
-
-session = get_session()  # db.session
+session = db_ops.get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
-active_config = config.get_active_config(parse=True)
+active_config = db_ops.get_active_config(parse=True)
 if active_config:
     log_path = active_config.disk_management.log_path
 else:
@@ -185,7 +182,7 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
 # @listen_opt
 def start():
     # get the device id
-    session = get_session()
+    session = db_ops.get_session()
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     # if listen == "local" and storage == "remote":
@@ -193,13 +190,13 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = config.get_active_config(session=session, parse=True)
+    active_config = db_ops.get_active_config(session=session, parse=True)
     if not(active_config):
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
             'through the CLI. Type "nodeorc upload-config --help" for more information'
         )
-    water_level_config = config.get_water_level_config(session=session)
+    water_level_config = db_ops.get_water_level_config(session=session)
     if not(water_level_config):
         raise click.UsageError(
             'You do not yet have a water level configuration. Upload a water level retrieval '
@@ -210,7 +207,7 @@ def start():
     # initialize the database for storing data
     # session_data = db.init_basedata.get_data_session()
     # read the task form from the configuration
-    task_form_template = config.get_active_task_form(session, parse=True)
+    task_form_template = db_ops.get_active_task_form(session, parse=True)
     callback_url = active_config.callback_url
     if task_form_template is None:
         # go into the task form get daemon and try to acquire a task form from server every 5 minutes
@@ -243,7 +240,7 @@ def start():
             f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
         )
         # This only happens with version upgrades. Update the status to BROKEN and report back to platform
-        task_form_template = config.get_active_task_form(session, parse=False)
+        task_form_template = db_ops.get_active_task_form(session, parse=False)
         task_form_template.status = db.models.TaskFormStatus.BROKEN
         device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
         session.commit()
@@ -251,8 +248,8 @@ def start():
         processor = tasks.LocalTaskProcessor(
             task_form_template=task_form_template,
             logger=logger,
+            water_level_config=water_level_config,
             **active_config.model_dump()
-            **water_level_config,
         )
         processor.await_task()
     except Exception as e:
@@ -280,7 +277,7 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config_ = load_config(json_file)
-    rec = config.add_config(session, config=config_, set_as_active=set_as_active)
+    rec = db_ops.add_config(session, config=config_, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 @click.command(
@@ -333,7 +330,7 @@ def upload_water_level_script(script, script_type, file_template, frequency, dat
         "valid outputs. If API is called, ensure a valid response is returned and you are connected to internet."
     )
 
-    rec = config.add_replace_water_level_script(
+    rec = db_ops.add_replace_water_level_script(
         session,
         script,
         script_type,

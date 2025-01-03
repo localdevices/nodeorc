@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+
 import sqlalchemy
 
 from typing import Optional, Literal
@@ -94,7 +96,7 @@ def add_replace_active_config(
     return active_config_record
 
 from sqlalchemy.orm import Session
-from nodeorc.db.models import WaterLevelSettings
+from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries
 
 
 def add_replace_water_level_script(
@@ -158,7 +160,8 @@ def add_replace_water_level_script(
         session.rollback()
         raise ValueError(f"Error occurred: {e}")
 
-
+def get_session():
+    return db.session
 
 def get_settings(session, id):
     """
@@ -220,12 +223,14 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
         task_form = task_form.task_body
     return task_form
 
+
 def get_water_level_config(session):
     query = session.query(WaterLevelSettings)
     if len(query.all()) == 0:
         # there are no task forms yet, return None
         return None
     return session.query(WaterLevelSettings).first()
+
 
 def patch_active_config_to_accepted():
     """If active config is still CANDIDATE, upgrade to ACCEPTED """
@@ -248,3 +253,105 @@ def get_data_folder():
     if config:
         return config.disk_management.home_folder
     return None
+
+
+def add_water_level(
+    session: Session,
+    timestamp: datetime,
+    level: float
+):
+    """
+    Adds a new water level record to the database using the provided session.
+
+    Parameters
+    ----------
+    session : Session
+        Active SQLAlchemy database session.
+    timestamp : datetime
+        Timestamp of the water level reading.
+    level : float
+        Water level value [m].
+
+    Returns
+    -------
+    WaterLevelTimeSeries
+        The created water level record.
+    """
+    try:
+        # check if the time stamp already exists in the database
+        water_level = session.query(WaterLevelTimeSeries).filter_by(timestamp=timestamp).first()
+        if not water_level:
+            # Create a new instance of WaterLevelSettings with given data
+            water_level = WaterLevelTimeSeries(
+                timestamp=timestamp,
+                level=level
+            )
+            session.add(water_level)  # Add record to the session
+            session.commit()  # Commit the transaction
+        return water_level  # Return the new record
+    except Exception as e:
+        # Rollback session in case of an error
+        session.rollback()
+        raise ValueError(f"Failed to add water level: {e}")
+
+
+def get_water_level(
+        session: Session,
+        timestamp: datetime,
+        allowed_dt: Optional[float] = None,
+):
+    """Fetch the water level closest to the given timestamp.
+
+    This function queries a database to find the water level record that is closest
+    to the specified timestamp. If both prior and subsequent water level records
+    exist, it determines the closest one based on the absolute time difference.
+    Optionally, it checks whether the closest record falls within an allowed
+    time difference from the specified timestamp.
+
+    Parameters
+    ----------
+    session : Session
+        Database session used to query water level records.
+    timestamp : datetime
+        The point in time for which the closest water level record is sought.
+    allowed_dt : float, optional
+        Maximum allowed time difference, in seconds, between the closest
+        record's timestamp and the specified timestamp. If provided,
+        the function raises a ValueError if no record fits within this range.
+
+    Returns
+    -------
+    WaterLevelTimeSeries
+        The water level record closest to the specified timestamp.
+
+    Raises
+    ------
+    ValueError
+        If no water level record is found or if no record is within the allowed
+        time difference from the specified timestamp when `allowed_dt` is used.
+    """
+    before_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp <= timestamp).order_by(WaterLevelTimeSeries.timestamp.desc()).first()
+    after_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp > timestamp).order_by(WaterLevelTimeSeries.timestamp).first()
+    
+    # Determine the closest record
+    closest_record = None
+    if before_record and after_record:
+        if abs((before_record.timestamp - timestamp).total_seconds()) <= abs((after_record.timestamp - timestamp).total_seconds()):
+            closest_record = before_record
+        else:
+            closest_record = after_record
+    elif before_record:
+        closest_record = before_record
+    elif after_record:
+        closest_record = after_record
+
+    if not closest_record:
+        raise ValueError(f"No water level entries found for timestamp: {timestamp}")
+
+    if allowed_dt:
+        # Ensure the time difference is within the allowed range
+        diff = abs((closest_record.timestamp - timestamp).total_seconds())
+        if diff > allowed_dt:
+            raise ValueError(f"No water level found within {allowed_dt} seconds of timestamp {timestamp}.")
+
+    return closest_record

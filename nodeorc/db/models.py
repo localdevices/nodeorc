@@ -1,4 +1,3 @@
-import datetime
 import enum
 import json
 import psutil
@@ -7,6 +6,8 @@ import re
 import socket
 import uuid
 
+from datetime import datetime
+from pytz import UTC
 from sqlalchemy import event, Column, Enum, Integer, String, ForeignKey, DateTime, JSON, Boolean, Float
 from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base, validates
 
@@ -53,7 +54,7 @@ class Device(Base):
     )
     created_at = Column(
         DateTime,
-        default=datetime.datetime.now(datetime.UTC),
+        default=lambda: datetime.now(),
         nullable=False
     )
     operating_system = Column(
@@ -98,7 +99,6 @@ class Device(Base):
         device_info["status"] = self.status.value
         device_info["form_status"] = self.form_status.value
         device_info["nodeorc_version"] = self.nodeorc_version
-
         return device_info
 
 
@@ -106,7 +106,7 @@ class Settings(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     parse_dates_from_file = Column(
         Boolean,
         default=True,
@@ -162,7 +162,7 @@ class DiskManagement(Base):
     __tablename__ = 'disk_management'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     home_folder = Column(
         String,
         default="/home",
@@ -196,7 +196,7 @@ class CallbackUrl(Base):
     __tablename__ = 'callback_url'
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     server_name = Column(
         String,
         comment="User defined recognizable name for server"
@@ -234,7 +234,7 @@ class Storage(Base):
     __tablename__ = "storage"
 
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     url = Column(
         String,
         default="./tmp",
@@ -254,7 +254,7 @@ class Storage(Base):
 class WaterLevelSettings(Base):
     __tablename__ = "water_level"
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     datetime_fmt = Column(
         String,
         default="%Y-%m-%dT%H:%M:%SZ",
@@ -297,8 +297,8 @@ class WaterLevelSettings(Base):
             raise ValueError("Invalid datetime format string: % is missing.")
         try:
             # Test the format using strptime with a sample date
-            _ = datetime.datetime.strptime(
-                datetime.datetime.now().strftime(value),
+            _ = datetime.strptime(
+                datetime.now().strftime(value),
                 value
             )
         except ValueError:
@@ -316,8 +316,8 @@ class WaterLevelSettings(Base):
         datetime_format = datetime_format_match.group(1)
         try:
             # Validate the datetime format by string formatting it, and then parsing it back to a datetime instance
-            _ = datetime.datetime.strptime(
-                datetime.datetime.now().strftime(datetime_format),
+            _ = datetime.strptime(
+                datetime.now().strftime(datetime_format),
                 datetime_format
             )
         except ValueError:
@@ -390,7 +390,7 @@ class TaskForm(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True
     )
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     status = Column(Enum(TaskFormStatus), default=TaskFormStatus.NEW)
     task_body = Column(JSON)
     message = Column(String, nullable=True)  # error message if any
@@ -399,7 +399,7 @@ class TaskForm(Base):
 class Callback(Base):
     __tablename__ = "callback"
     id = Column(Integer, primary_key=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now())
     body = Column(JSON)
 
     def __str__(self):
@@ -428,7 +428,7 @@ class WaterLevelTimeSeries(Base):
     ----------
     id : int
         Unique identifier for each water level record.
-    timestamp : datetime.datetime
+    timestamp : datetime
         The date and time when the water level measurement was taken. Defaults to
         the current UTC datetime at the time of record creation.
     level : float
@@ -436,5 +436,11 @@ class WaterLevelTimeSeries(Base):
     """
     __tablename__ = "water_level_time_series"
     id = Column(Integer, primary_key=True)
-    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    timestamp = Column(DateTime, default=lambda: datetime.now())
     level = Column(Float, nullable=False)
+
+    def __str__(self):
+        return "{}: {}".format(self.timestamp, self.level)
+
+    def __repr__(self):
+        return "{}".format(self.__str__())

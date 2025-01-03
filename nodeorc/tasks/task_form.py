@@ -113,12 +113,13 @@ def request_remote_task_form(session, callback_url, device, logger=logging):
 
         headers = {"Authorization": f"Bearer {callback_url.token_access}"}
         t_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if datetime.now(UTC) > callback_url.token_expiration:
-            logger.info("Token expired, requesting new token...")
-            # first refresh tokens
-            callback_url.refresh_tokens()
-            # update headers
-            headers = {"Authorization": f"Bearer {callback_url.token_access}"}
+        if callback_url.token_expiration:
+            if datetime.now(UTC) > callback_url.token_expiration:
+                logger.info("Token expired, requesting new token...")
+                # first refresh tokens
+                callback_url.refresh_tokens()
+                # update headers
+                headers = {"Authorization": f"Bearer {callback_url.token_access}"}
 
         r = requests.get(
             url,

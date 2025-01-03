@@ -29,7 +29,7 @@ def check_script_security(script_content):
         r'\b(os\.system)',  # Dangerous os.system calls
         r'\b(subprocess\.(call|run|Popen))',  # Subprocess calls with no restrictions
         r'\b(eval|exec)\b',  # Dynamic code execution
-        r'\b(open\(.+\)\b)[\'\"]w',  # Opening files for writing
+        r'open\s*\(\s*.*\s*,\s*[\'\"]w[\'\"]',  # Opening files for writing
         r'\b(import os)',  # Entire `os` module (potentially dangerous)
         r'\b(import subprocess)',  # Entire `subprocess` module (potentially dangerous)
         r'\b(import shutil)',  # File manipulation risks
@@ -94,7 +94,7 @@ def execute_water_level_script(
     Returns
     -------
     tuple
-        (datetime_string: str, float_value: float)
+        (datetime, float)
 
     Raises
     ------
@@ -157,7 +157,7 @@ def read_water_level_file(fn, fmt):
     return df
 
 
-def get_water_level(
+def get_water_level_file(
         timestamp,
         file_fmt,
         datetime_fmt,
