@@ -30,7 +30,6 @@ load_dotenv()
 
 device = session.query(db.models.Device).first()
 
-
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
@@ -178,8 +177,6 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
         ctx.obj = {}
 
 @cli.command(short_help="Start main daemon")
-# @storage_opt
-# @listen_opt
 def start():
     # get the device id
     session = db_ops.get_session()
@@ -280,7 +277,7 @@ def upload_config(json_file, set_as_active):
     rec = db_ops.add_config(session, config=config_, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
-@click.command(
+@cli.command(
     short_help="Upload a new water level script to NodeORC database",
 )
 @click.option(
@@ -298,7 +295,6 @@ def upload_config(json_file, set_as_active):
     default="bash",
     help="Script type (either 'python' or 'bash')",
 )
-
 @click.option(
     "-f",
     "--file-template",
