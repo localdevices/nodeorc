@@ -49,7 +49,7 @@ install_dependencies () {
     then
         echo "CentOS system detected, running yum"
 	sudo yum -y update
-	sudo yum install ffmpeg libsm6 libxext6 libgl1 python3-venv libgdal-dev jq -y
+	sudo yum install ffmpeg libsm6 libxext6 libgl1 python3.11-dev python3-venv libgdal-dev jq -y
     elif [[ `hostnamectl` =~ .*"Ubuntu".* ]] || [[ `hostnamectl` =~ .*"pop-os".* ]] || [[ `hostnamectl` =~ .*"Mint".* ]] || [[ `hostnamectl` =~ .*"Debian".* ]];
     then
         echo "Ubuntu-like system detected, trying apt"

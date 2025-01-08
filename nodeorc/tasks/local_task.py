@@ -280,19 +280,13 @@ class LocalTaskProcessor:
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
-            try:
-                h_a = water_level.get_water_level_file(
-                    timestamp,
-                    file_fmt=self.water_level_file_template,
-                    datetime_fmt=self.water_level_config["datetime_fmt"],
-                    allowed_dt=self.settings["allowed_dt"]
-                )
-                self.logger.info(f"Water level found with value {h_a} m.")
-            except Exception as e:
-                message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
-                device.message = message
-                session.commit()
-                raise ValueError(message)
+            h_a = get_water_level(
+                timestamp,
+                file_fmt=self.water_level_file_template,
+                datetime_fmt=self.water_level_config["datetime_fmt"],
+                allowed_dt=self.settings["allowed_dt"],
+                logger=self.logger
+            )
             # create the task object from all data
             task = create_task(
                 self.task_form_template,
@@ -492,6 +486,40 @@ def get_timestamp(
     else:
         timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(fn))
     return timestamp
+
+
+def get_water_level(
+    timestamp,
+    file_fmt,
+    datetime_fmt,
+    allowed_dt=10,
+    session=session,
+    logger=logging
+):
+    try:
+        # first try to get water level from database
+        rec = db_ops.get_water_level(session, timestamp, allowed_dt)
+        timestamp = rec.timestamp
+        h_a = rec.level
+        logger.info(f"Water level found in database at closest timestamp {timestamp} with value {h_a} m.")
+    except Exception as db_ex:
+        logger.warning(f"Failed to fetch water level from database at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Trying data file.")
+        try:
+            # fallback to getting water level from file
+            h_a = water_level.get_water_level_file(
+                timestamp,
+                file_fmt=file_fmt,
+                datetime_fmt=datetime_fmt,
+                allowed_dt=allowed_dt
+            )
+
+            logger.info(f"Water level found in file with value {h_a} m.")
+        except Exception as e:
+            message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
+            device.message = message
+            session.commit()
+            raise ValueError(message)
+    return timestamp, h_a
 
 
 def create_task(

@@ -296,9 +296,9 @@ def add_water_level(
 
 
 def get_water_level(
-        session: Session,
-        timestamp: datetime,
-        allowed_dt: Optional[float] = None,
+    session: Session,
+    timestamp: datetime,
+    allowed_dt: Optional[float] = None,
 ):
     """Fetch the water level closest to the given timestamp.
 
@@ -330,6 +330,8 @@ def get_water_level(
         If no water level record is found or if no record is within the allowed
         time difference from the specified timestamp when `allowed_dt` is used.
     """
+    # SQLite does not allow for tzinfo in a time stamp, therefore, first remove the tzinfo if it exists
+    timestamp = timestamp.replace(tzinfo=None)
     before_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp <= timestamp).order_by(WaterLevelTimeSeries.timestamp.desc()).first()
     after_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp > timestamp).order_by(WaterLevelTimeSeries.timestamp).first()
     
