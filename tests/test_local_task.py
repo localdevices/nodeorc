@@ -143,12 +143,21 @@ def test_get_water_level_file_not_available(session_config, monkeypatch):
             session=session_config,
         )
 
-def test_cleanup_space(local_task_processor):
+def test_cleanup_enough_space(local_task_processor):
     # only test if the function returns true if the free space is above minimum required space.
     free_space = 500  #GB
     # disk_management_mock.cleanup.return_value = True
     result = local_task_processor.cleanup_space(free_space)
     assert result is None or result is True  # Based on the expected response
+
+
+def test_cleanup_too_little_space(local_task_processor):
+    # only test if the function returns true if the free space is above minimum required space.
+    free_space = 2  #GB
+    # disk_management_mock.cleanup.return_value = True
+    result = local_task_processor.cleanup_space(free_space)
+    assert result is None or result is True  # Based on the expected response
+
 
 
 # def test_process_file(local_task_processor):
