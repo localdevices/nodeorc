@@ -293,6 +293,7 @@ def upload_config(json_file, set_as_active):
     "--script-type",
     type=click.Choice(["python", "bash"]),
     default="bash",
+    show_default=True,
     help="Script type (either 'python' or 'bash')",
 )
 @click.option(
@@ -300,13 +301,15 @@ def upload_config(json_file, set_as_active):
     "--file-template",
     type=str,
     default="wl_{%Y%m%d}.txt",
-    help="file template with optional datetime format between curly braces {}",
+    help="file template with optional datetime format between curly braces {}.",
+    show_default=True,
+    required=True,
 )
 @click.option(
     "-fr",
     "--frequency",
     type=float,
-    help="frequency of the script execution in seconds",
+    help="frequency of the script execution in seconds.",
     default=600,
     show_default=True,
     required=True,
@@ -317,7 +320,7 @@ def upload_config(json_file, set_as_active):
     "--datetime-fmt",
     type=str,
     default="%Y-%m-%dT%H:%M:%SZ",
-    help="datetime format of datetime indexes in the water level files",
+    help="datetime format of datetime indexes in the water level files.",
     show_default=True,
 )
 def upload_water_level_script(script, script_type, file_template, frequency, datetime_fmt):
