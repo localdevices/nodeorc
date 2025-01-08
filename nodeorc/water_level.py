@@ -124,7 +124,7 @@ def execute_water_level_script(
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Script execution failed: {e.output.strip()}") from e
     except (ValueError, IndexError) as e:
-        raise ValueError(f"Invalid result format: {last_line}") from e
+        raise ValueError(f"Invalid result format: {last_line}, must be of form %Y-%m-%dT%H:%M:%SZ,<value>") from e
 
 
 def read_water_level_file(fn, fmt):

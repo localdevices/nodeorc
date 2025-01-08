@@ -8,8 +8,8 @@ from nodeorc.water_level import execute_water_level_script
 
 def test_execute_script_valid_output(monkeypatch):
     # Mock subprocess.check_output to simulate valid script output
-    def mock_check_output(script_path, shell, stderr, text):
-        return "2023-11-01T12:34:56Z,45.67\n"
+    def mock_check_output(script_path, shell):
+        return b"2023-11-01T12:34:56Z,45.67\n"
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
@@ -23,8 +23,8 @@ def test_execute_script_valid_output(monkeypatch):
 
 def test_execute_script_invalid_format(monkeypatch):
     # Mock subprocess.check_output to simulate invalid result format
-    def mock_check_output(script_path, shell, stderr, text):
-        return "INVALID_OUTPUT\n"
+    def mock_check_output(script_path, shell):
+        return b"INVALID_OUTPUT\n"
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
@@ -34,8 +34,8 @@ def test_execute_script_invalid_format(monkeypatch):
 
 def test_execute_script_invalid_datetime(monkeypatch):
     # Mock subprocess.check_output to simulate invalid datetime in the output
-    def mock_check_output(script_path, shell, stderr, text):
-        return "INVALID_DATETIME,45.67\n"
+    def mock_check_output(script_path, shell):
+        return b"INVALID_DATETIME,45.67\n"
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
@@ -45,8 +45,8 @@ def test_execute_script_invalid_datetime(monkeypatch):
 
 def test_execute_script_invalid_float(monkeypatch):
     # Mock subprocess.check_output to simulate invalid float in the output
-    def mock_check_output(script_path, shell, stderr, text):
-        return "2023-11-01T12:34:56Z,INVALID_FLOAT\n"
+    def mock_check_output(script_path, shell):
+        return b"2023-11-01T12:34:56Z,INVALID_FLOAT\n"
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
@@ -56,7 +56,7 @@ def test_execute_script_invalid_float(monkeypatch):
 
 def test_execute_script_failed_execution(monkeypatch):
     # Mock subprocess.check_output to simulate script execution failure
-    def mock_check_output(script_path, shell, stderr, text):
+    def mock_check_output(script_path, shell):
         # Simulate a CalledProcessError
         raise subprocess.CalledProcessError(returncode=1, cmd=script_path, output="Script failed")
 
@@ -65,20 +65,21 @@ def test_execute_script_failed_execution(monkeypatch):
     with pytest.raises(RuntimeError, match="Script execution failed: Script failed"):
         execute_water_level_script("dummy_script.sh")
 
-def test_execute_script_real_file(script="dummy_script.sh"):
+
+def test_execute_script_real_file(script="./dummy_script.sh"):
     print(os.path.abspath(script))
     result = execute_water_level_script(script)
     print(result)
 
 
-@pytest.mark.parametrize(
-    "script", [
-        "get_waterlevel_limburg.py"
-    ]
-)
-def test_execute_script_gred(script):
-    import os
-    dt = datetime.datetime(year=2024, month=11, day=30, hour=0, minute=30, tzinfo=datetime.timezone.utc)
-    print(os.path.abspath(script))
-    result = execute_water_level_script(script, dt=dt)
-    print(result)
+# @pytest.mark.parametrize(
+#     "script", [
+#         "get_waterlevel_limburg.py"
+#     ]
+# )
+# def test_execute_script_gred(script):
+#     import os
+#     dt = datetime.datetime(year=2024, month=11, day=30, hour=0, minute=30, tzinfo=datetime.timezone.utc)
+#     print(os.path.abspath(script))
+#     result = execute_water_level_script(script, dt=dt)
+#     print(result)

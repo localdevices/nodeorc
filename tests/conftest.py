@@ -86,50 +86,8 @@ def session_water_levels(session_config):
 
 
 @pytest.fixture
-def video_sample_url():
-    return "https://raw.githubusercontent.com/localdevices/pyorc/main/examples/ngwerere/ngwerere_20191103.mp4"
-
-@pytest.fixture
-def recipe_url():
-    return "https://raw.githubusercontent.com/localdevices/pyorc/main/examples/ngwerere/ngwerere.yml"
-
-
-@pytest.fixture
-def camconfig_url():
-    return "https://raw.githubusercontent.com/localdevices/pyorc/main/examples/ngwerere/ngwerere.json"
-
-
-@pytest.fixture
-def crossection_url():
-    return "https://raw.githubusercontent.com/localdevices/pyorc/main/examples/ngwerere/cross_section1.geojson"
-
-@pytest.fixture
-def output_nc():
-    return os.path.join(os.path.dirname(__file__), "examples", "ngwerere_transect.nc")
-
-
-@pytest.fixture
 def logger():
     return log.start_logger(True, False)
-
-
-@pytest.fixture
-def callback_url():
-    obj = models.CallbackUrl(
-        url="http://127.0.0.1:1080",
-        token=None,
-        refresh_token=None,
-    )
-    return obj
-
-@pytest.fixture
-def callback_url_amqp():
-    obj = models.CallbackUrl(
-        url="http://mockserver:1080",
-        token=None
-    )
-    return obj
-
 
 
 @pytest.fixture
