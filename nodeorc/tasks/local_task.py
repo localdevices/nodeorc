@@ -157,6 +157,7 @@ class LocalTaskProcessor:
                         script=self.water_level_config["script"],
                         script_type=self.water_level_config["script_type"],
                     )
+                    self.logger.info(f"Water level found for timestamp {timestamp} with value {level}. Will add to database if not already existing.")
                     db_ops.add_water_level(session=session, timestamp=timestamp, level=level)
                     if single_task:
                         return timestamp, level
@@ -280,7 +281,7 @@ class LocalTaskProcessor:
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
-            h_a = get_water_level(
+            timestamp_level, h_a = get_water_level(
                 timestamp,
                 file_fmt=self.water_level_file_template,
                 datetime_fmt=self.water_level_config["datetime_fmt"],
