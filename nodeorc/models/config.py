@@ -77,14 +77,8 @@ class DiskManagement(BaseModel):
         return p
 
 class Settings(BaseModel):
-    # incoming_path: DirectoryPath
-    # failed_path: DirectoryPath
-    # success_path: DirectoryPath
-    # results_path: DirectoryPath
     parse_dates_from_file: StrictBool = False
     video_file_fmt: str
-    water_level_fmt: str
-    water_level_datetimefmt: str
     allowed_dt: float
     shutdown_after_task: StrictBool = False
     reboot_after: float = 0
@@ -95,13 +89,6 @@ class Settings(BaseModel):
         # check string within {}, see if that can be parsed to datetime
         check_datetime_fmt(v)
         return v
-
-    @field_validator("water_level_fmt")
-    @classmethod
-    def check_water_level_fmt(cls, v):
-        check_datetime_fmt(v)
-        return v
-
 
 class RemoteConfig(BaseModel):
     amqp_connection: AnyHttpUrl

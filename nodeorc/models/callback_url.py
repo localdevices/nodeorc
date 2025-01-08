@@ -121,10 +121,10 @@ class CallbackUrl(BaseModel):
 
         """
         # get the active configuration record
-        from .. import config  # import lazily to avoid circular referencing
+        from .. import db_ops  # import lazily to avoid circular referencing
         from ..db import session  # import lazily to avoid circular referencing
 
-        active_config = config.get_active_config()
+        active_config = db_ops.get_active_config()
         callback_url = active_config.callback_url
         # update the tokens
         callback_url.token_access = self.token_access

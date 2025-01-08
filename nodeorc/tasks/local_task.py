@@ -1,24 +1,23 @@
+import concurrent.futures
 import copy
+import datetime
+import logging
+import multiprocessing
+import os
 import shutil
 import sys
 import threading
-import concurrent.futures
-import logging
-import multiprocessing
-import numpy as np
-import os
-import pandas as pd
 import time
-import datetime
 import uuid
 from urllib.parse import urljoin
-from requests.exceptions import ConnectionError
 
-from .. import models, disk_mng, db, config, utils
-from . import request_task_form
+import numpy as np
 
+from nodeorc.tasks import request_task_form
+from nodeorc import models, disk_mng, db, db_ops, utils, water_level
 
-device = db.session.query(db.models.Device).first()
+session = db_ops.get_session()
+device = session.query(db.models.Device).first()
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
 
@@ -29,8 +28,10 @@ class LocalTaskProcessor:
             callback_url: models.CallbackUrl,
             storage: models.Storage,
             settings: models.Settings,
+            water_level_config: dict,
             disk_management: models.DiskManagement,
             max_workers: int = 1,
+            auto_start_threads: bool = True,
             logger=logging,
 
     ):
@@ -40,14 +41,15 @@ class LocalTaskProcessor:
         self.disk_management = models.DiskManagement(**disk_management)
         self.callback_url = models.CallbackUrl(**callback_url)
         self.storage = models.Storage(**storage)
+        self.water_level_config = water_level_config
         self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
         self.processing = False  # state for checking if any processing is going on
         self.reboot = False  # state that checks if a scheduled reboot should be done
-        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.settings["water_level_fmt"])
+        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.water_level_config["file_template"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{self.settings["water_level_datetimefmt"]}')
+        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{water_level_config["datetime_fmt"]}')
         self.logger.info(f"Start listening to new videos in folder {self.disk_management.incoming_path}.")
         self.event = threading.Event()
 
@@ -55,9 +57,19 @@ class LocalTaskProcessor:
         self.thread = threading.Thread(
             target=self.await_task,
         )
+        # add a thread for regular retrieval of water levels
+        self.water_level_thread = threading.Thread(
+            target=self.add_water_level
+        )
+        if auto_start_threads:
+            # automatically start threads
+            self.start_threads()
+
+    def start_threads(self):
         self.thread.start()
+        self.water_level_thread.start()
         try:
-            # Your main program can continue running here
+            # No events would mean the program can stop
             while not self.event.is_set():
                 time.sleep(1)
             self.logger.info("await_task event was triggered. Exiting the program.")
@@ -69,7 +81,7 @@ class LocalTaskProcessor:
         self.logger.info("Program terminated.")
 
 
-    def await_task(self):
+    def await_task(self, single_task=False):
         # Get the number of available CPU cores
         max_workers = np.minimum(
             self.max_workers,
@@ -109,6 +121,9 @@ class LocalTaskProcessor:
                         # make sure the file is in the list of processed files to ensure the task is not
                         # duplicated to another thread instance
                         self.processed_files.add(file_path)
+                        if single_task:
+                            # only one task must be performed, return
+                            return True
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
                 # do housekeeping, reboots, new task forms, disk management
                 if self.settings["reboot_after"] != 0:
@@ -131,6 +146,28 @@ class LocalTaskProcessor:
                     if free_space < self.disk_management.min_free_space:
                         self.cleanup_space(free_space=free_space)
 
+    def add_water_level(self, single_task=False):
+        self.logger.info("Starting thread for retrieving water levels")
+        # TODO: retrieve water level parameters and only if available run this!
+        if self.water_level_config:
+            while not self.event.is_set():
+                try:
+                    self.logger.info("Checking for water levels.")
+                    timestamp, level = water_level.execute_water_level_script(
+                        script=self.water_level_config["script"],
+                        script_type=self.water_level_config["script_type"],
+                    )
+                    self.logger.info(f"Water level found for timestamp {timestamp} with value {level}. Will add to database if not already existing.")
+                    db_ops.add_water_level(session=session, timestamp=timestamp, level=level)
+                    if single_task:
+                        return timestamp, level
+                except Exception as e:
+                    self.logger.error(f"Error in retrieval of water levels: {e}")
+                # sleep for configured amount of seconds
+                time.sleep(self.water_level_config["frequency"])
+            self.logger.info("Water level thread terminated.")
+        else:
+            self.logger.info("No water level parameters configured, skipping retrieval.")
 
 
     def cleanup_space(self, free_space):
@@ -185,7 +222,7 @@ class LocalTaskProcessor:
 
     def get_new_task_form(self):
         new_task_form_row = request_task_form(
-            session=db.session,
+            session=session,
             callback_url=self.callback_url,
             device=device,
             logger=self.logger
@@ -228,7 +265,7 @@ class LocalTaskProcessor:
                 timestamp = None
                 message = f"Could not get a logical timestamp from file {file_path}. Reason: {e}"
                 device.message = message
-                db.session.commit()
+                session.commit()
                 raise ValueError(message)
                 # set message on device
             # create Storage instance
@@ -244,19 +281,13 @@ class LocalTaskProcessor:
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
-            try:
-                h_a = get_water_level(
-                    timestamp,
-                    file_fmt=self.water_level_file_template,
-                    datetime_fmt=self.settings["water_level_datetimefmt"],
-                    allowed_dt=self.settings["allowed_dt"]
-                )
-                self.logger.info(f"Water level found with value {h_a} m.")
-            except Exception as e:
-                message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
-                device.message = message
-                db.session.commit()
-                raise ValueError(message)
+            timestamp_level, h_a = get_water_level(
+                timestamp,
+                file_fmt=self.water_level_file_template,
+                datetime_fmt=self.water_level_config["datetime_fmt"],
+                allowed_dt=self.settings["allowed_dt"],
+                logger=self.logger
+            )
             # create the task object from all data
             task = create_task(
                 self.task_form_template,
@@ -279,7 +310,7 @@ class LocalTaskProcessor:
                     timestamp.strftime("%Y%m%d")
                 )
             # video is success, if task form is still CANDIDATE, upgrade to ACCEPTED
-            config.patch_active_config_to_accepted()
+            db_ops.patch_active_config_to_accepted()
             # perform the callbacks here only when video was successfully completed
             # set files and cleanup
             self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
@@ -289,7 +320,7 @@ class LocalTaskProcessor:
             callback_success = False  # video was unsuccessful so callbacks are also not successful
             message = f"Error processing {file_path}: {str(e)}"
             device.message = message
-            db.session.commit()
+            session.commit()
             self.logger.error(message)
             # find back the file and place in the failed location, organised per day
             if timestamp:
@@ -299,7 +330,7 @@ class LocalTaskProcessor:
             # set files and cleanup
             self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
             # also check if the current form is a CANDIDATE form. If so report to device and roll back to the ACCEPTED FORM
-            task_form_template = config.get_active_task_form(db.session, parse=False)
+            task_form_template = db_ops.get_active_task_form(session, parse=False)
 
         # once done, the file is removed from list of considered files for processing
         self.processed_files.remove(file_path)
@@ -389,8 +420,7 @@ class LocalTaskProcessor:
         Try to post remaining non-posted callbacks and change their states in database
         if successful
         """
-        session_data = db.init_basedata.get_data_session()
-        callback_records = session_data.query(db.models.Callback)
+        callback_records = session.query(db.models.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
         success = True
@@ -411,8 +441,8 @@ class LocalTaskProcessor:
             if not(success):
                 # immediately stop the processing of callbacks
                 break
-            session_data.delete(callback_record)
-            session_data.commit()
+            session.delete(callback_record)
+            session.commit()
 
 
 def get_timestamp(
@@ -459,85 +489,39 @@ def get_timestamp(
     return timestamp
 
 
-def read_water_level_file(fn, fmt):
-    """
-    Parse water level file using supplied datetime format
-
-    Parameters
-    ----------
-    fn : str
-        water level file
-    fmt : str
-        datetime format
-
-    Returns
-    -------
-    pd.DataFrame
-        content of water level file
-
-    """
-    date_parser = lambda x: datetime.datetime.strptime(x, fmt)
-    df = pd.read_csv(
-        fn,
-        parse_dates=True,
-        index_col=[0],
-        sep=" ",
-        date_parser=date_parser,
-        header=None,
-        names=["water_level"]
-    )
-    return df
-
-# Define the function to process a single file
-
 def get_water_level(
     timestamp,
     file_fmt,
     datetime_fmt,
-    allowed_dt=None,
+    allowed_dt=10,
+    session=session,
+    logger=logging
 ):
-    """
-    Get water level from file(s)
-
-    Parameters
-    ----------
-    timestamp : datetime
-        timestamp to seek in water level file(s)
-    file_fmt : str
-        water level file template with possible datetime format in between {}
-    datetime_fmt : str
-        datetime format used inside water level files
-    allowed_dt : float
-        maximum difference between closest water level and video timestamp
-
-    Returns
-    -------
-    float
-        water level
-    """
-    if "{" in file_fmt and "}" in file_fmt:
-        datetimefmt = file_fmt.split("{")[1].split("}")[0]
-        water_level_template = file_fmt.replace(datetimefmt, ":s")
-        water_level_fn = water_level_template.format(timestamp.strftime(datetimefmt))
-    else:
-        # there is no date pattern, so assume the fmt is already a file path
-        water_level_fn = file_fmt
-    if not(os.path.isfile(water_level_fn)):
-        raise IOError(f"water level file {os.path.abspath(water_level_fn)} does not exist.")
-    df = read_water_level_file(water_level_fn, fmt=datetime_fmt)
-    t = timestamp.strftime("%Y%m%d %H:%M:%S")
-    # find the closest match
-    i = np.minimum(np.maximum(df.index.searchsorted(t), 0), len(df) - 1)
-    # check if value is within limits of time allowed
-    if allowed_dt is not None:
-        dt_seconds = abs(df.index[i] - timestamp).total_seconds()
-        if dt_seconds > allowed_dt:
-            raise ValueError(
-                f"Timestamp of video {timestamp} is more than {allowed_dt} seconds off from closest "
-                f"water level timestamp {df.index[i]}"
+    try:
+        # first try to get water level from database
+        rec = db_ops.get_water_level(session, timestamp, allowed_dt)
+        timestamp = rec.timestamp
+        h_a = rec.level
+        logger.info(f"Water level found in database at closest timestamp {timestamp} with value {h_a} m.")
+    except Exception as db_ex:
+        logger.warning(f"Failed to fetch water level from database at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Trying data file.")
+        try:
+            # fallback to getting water level from file
+            h_a = water_level.get_water_level_file(
+                timestamp,
+                file_fmt=file_fmt,
+                datetime_fmt=datetime_fmt,
+                allowed_dt=allowed_dt
             )
-    h_a = df.iloc[i].values[0]
-    return h_a
+
+            logger.info(f"Water level found in file with value {h_a} m.")
+        except Exception as e:
+            message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
+            device.message = message
+            session.commit()
+            raise ValueError(message)
+    return timestamp, h_a
+
 
 def create_task(
     task_form_template,

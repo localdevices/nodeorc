@@ -7,12 +7,11 @@ from dotenv import load_dotenv
 # import tasks
 
 # import nodeorc specifics
-from . import db, log, models, config, tasks, settings_path, __version__
+from nodeorc import db, log, models, db_ops, tasks, settings_path, utils, __version__
 
-
-session = db.session
+session = db_ops.get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
-active_config = config.get_active_config(parse=True)
+active_config = db_ops.get_active_config(parse=True)
 if active_config:
     log_path = active_config.disk_management.log_path
 else:
@@ -30,7 +29,6 @@ load_dotenv()
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
 device = session.query(db.models.Device).first()
-
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
@@ -81,6 +79,18 @@ def validate_storage(ctx, param, value):
     elif "remote":
         # storage is defined by remote task so not relevant now
         pass
+    return value
+
+def load_script(ctx, param, value):
+    with open(value, "r") as f:
+        script = f.read()
+    return script
+
+def validate_frequency(ctx, param, value):
+    if value < 60:
+        raise click.BadParameter("Frequency must be at least 60 seconds (i.e. 1 minute)")
+    if value > 86400:
+        raise click.BadParameter("Frequency must be at most 86400 seconds (i.e. 1 day)")
     return value
 
 
@@ -167,10 +177,9 @@ def cli(ctx, info, license, debug):  # , quiet, verbose):
         ctx.obj = {}
 
 @cli.command(short_help="Start main daemon")
-# @storage_opt
-# @listen_opt
 def start():
     # get the device id
+    session = db_ops.get_session()
     logger.info(f"Device {str(device)} is online to run video analyses")
     # remote storage parameters with local processing is not possible
     # if listen == "local" and storage == "remote":
@@ -178,17 +187,24 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = config.get_active_config(parse=True)
+    active_config = db_ops.get_active_config(session=session, parse=True)
     if not(active_config):
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
             'through the CLI. Type "nodeorc upload-config --help" for more information'
         )
-
+    water_level_config = db_ops.get_water_level_config(session=session)
+    if not(water_level_config):
+        raise click.UsageError(
+            'You do not yet have a water level configuration. Upload a water level retrieval '
+            'script through the CLI. Type "nodeorc upload-water-level-script --help" for more information'
+        )
+    else:
+        water_level_config = utils.model_to_dict(water_level_config)
     # initialize the database for storing data
-    session_data = db.init_basedata.get_data_session()
+    # session_data = db.init_basedata.get_data_session()
     # read the task form from the configuration
-    task_form_template = config.get_active_task_form(session, parse=True)
+    task_form_template = db_ops.get_active_task_form(session, parse=True)
     callback_url = active_config.callback_url
     if task_form_template is None:
         # go into the task form get daemon and try to acquire a task form from server every 5 minutes
@@ -200,6 +216,8 @@ def start():
             logger=logger,
             reboot_after=active_config.settings.reboot_after
         )
+        # this return never happens, unless isolated unit tests are run
+        return 0
     else:
         # check for a new form with one single request
         logger.info("Checking if a new task form is available for me...")
@@ -219,7 +237,7 @@ def start():
             f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
         )
         # This only happens with version upgrades. Update the status to BROKEN and report back to platform
-        task_form_template = config.get_active_task_form(session, parse=False)
+        task_form_template = db_ops.get_active_task_form(session, parse=False)
         task_form_template.status = db.models.TaskFormStatus.BROKEN
         device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
         session.commit()
@@ -227,6 +245,7 @@ def start():
         processor = tasks.LocalTaskProcessor(
             task_form_template=task_form_template,
             logger=logger,
+            water_level_config=water_level_config,
             **active_config.model_dump()
         )
         processor.await_task()
@@ -255,8 +274,71 @@ def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config_ = load_config(json_file)
-    rec = config.add_config(session, config=config_, set_as_active=set_as_active)
+    rec = db_ops.add_config(session, config=config_, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
+
+@cli.command(
+    short_help="Upload a new water level script to NodeORC database",
+)
+@click.option(
+    "-s",
+    "--script",
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
+    callback=load_script,
+    help="location of the script file",
+    required=True
+)
+@click.option(
+    "-t",
+    "--script-type",
+    type=click.Choice(["python", "bash"]),
+    default="bash",
+    show_default=True,
+    help="Script type (either 'python' or 'bash')",
+)
+@click.option(
+    "-f",
+    "--file-template",
+    type=str,
+    default="wl_{%Y%m%d}.txt",
+    help="file template with optional datetime format between curly braces {}.",
+    show_default=True,
+    required=True,
+)
+@click.option(
+    "-fr",
+    "--frequency",
+    type=float,
+    help="frequency of the script execution in seconds.",
+    default=600,
+    show_default=True,
+    required=True,
+    callback=validate_frequency
+)
+@click.option(
+    "-dt",
+    "--datetime-fmt",
+    type=str,
+    default="%Y-%m-%dT%H:%M:%SZ",
+    help="datetime format of datetime indexes in the water level files.",
+    show_default=True,
+)
+def upload_water_level_script(script, script_type, file_template, frequency, datetime_fmt):
+    logger.info(f"Device {str(device)} receiving new water level script configuration. Script must provide ")
+    logger.info(
+        "valid outputs. If API is called, ensure a valid response is returned and you are connected to internet."
+    )
+
+    rec = db_ops.add_replace_water_level_script(
+        session,
+        script,
+        script_type,
+        file_template,
+        frequency,
+        datetime_fmt
+    )
+    logger.info(f"Settings updated successfully to {rec}")
+
 
 # def main():
 #     connection = pika.BlockingConnection(
