@@ -41,11 +41,17 @@ def scan_folder(incoming, clean_empty_dirs=True, suffix=None):
     Returns
     -------
     """
-    incoming = list(np.atleast_1d(incoming))
+    if not isinstance(incoming, list):
+        incoming = [incoming]
+    # ensure incoming is not byte encoded
+    incoming = [incoming if type(incoming) is not bytes else incoming.decode() for incoming in incoming]
     file_paths = []
     for folder in incoming:
         if not folder:
             return file_paths
+        # ensure folder is always of str type
+        if type(folder) is bytes:
+            folder = folder.decode()
         for root, paths, files in os.walk(folder):
             if clean_empty_dirs:
                 if len(paths) == 0 and len(files) == 0:
@@ -53,8 +59,6 @@ def scan_folder(incoming, clean_empty_dirs=True, suffix=None):
                     if os.path.abspath(root) != os.path.abspath(folder):
                         os.rmdir(root)
             for f in files:
-                if type(f) is bytes:
-                    f = f.decode()
                 full_path = os.path.join(root, f)
                 if suffix is not None:
                     if full_path[-len(suffix):] == suffix:
