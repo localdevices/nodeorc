@@ -25,22 +25,23 @@ class LocalTaskProcessor:
     def __init__(
             self,
             task_form_template,
-            callback_url: models.CallbackUrl,
-            storage: models.Storage,
-            settings: models.Settings,
+            # callback_url: models.CallbackUrl,
+            # storage: models.Storage,
+            # settings: models.Settings,
             water_level_config: dict,
-            disk_management: models.DiskManagement,
+            # disk_management: db_models.DiskManagement,
+            config: db.models.ActiveConfig,
             max_workers: int = 1,
             auto_start_threads: bool = True,
             logger=logging,
 
     ):
         self.task_form_template = task_form_template
-        self.settings = settings
-        self.video_file_ext = settings["video_file_fmt"].split(".")[-1]
-        self.disk_management = models.DiskManagement(**disk_management)
-        self.callback_url = models.CallbackUrl(**callback_url)
-        self.storage = models.Storage(**storage)
+        self.settings = config.settings
+        self.video_file_ext = config.settings.video_file_fmt.split(".")[-1]
+        self.disk_management = config.disk_management
+        self.callback_url = config.callback_url.pydantic
+        self.storage = config.storage.pydantic
         self.water_level_config = water_level_config
         self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
@@ -126,8 +127,8 @@ class LocalTaskProcessor:
                             return True
                 time.sleep(5)  # wait for 5 secs before re-investigating the monitored folder for new files
                 # do housekeeping, reboots, new task forms, disk management
-                if self.settings["reboot_after"] != 0:
-                    if time.time() - reboot_t0 > max(self.settings["reboot_after"], 3600) and not self.reboot:
+                if self.settings.reboot_after != 0:
+                    if time.time() - reboot_t0 > max(self.settings.reboot_after, 3600) and not self.reboot:
                         self.logger.info(f"Reboot scheduled after any running task after {max(self.settings['reboot_after'], 3600)} seconds")
                         self.reboot = True
                 self.reboot_now_or_not()
@@ -258,8 +259,8 @@ class LocalTaskProcessor:
             try:
                 timestamp = get_timestamp(
                     file_path,
-                    parse_from_fn=self.settings["parse_dates_from_file"],
-                    fn_fmt=self.settings["video_file_fmt"],
+                    parse_from_fn=self.settings.parse_dates_from_file,
+                    fn_fmt=self.settings.video_file_fmt,
                 )
             except Exception as e:
                 timestamp = None
@@ -285,7 +286,7 @@ class LocalTaskProcessor:
                 timestamp,
                 file_fmt=self.water_level_file_template,
                 datetime_fmt=self.water_level_config["datetime_fmt"],
-                allowed_dt=self.settings["allowed_dt"],
+                allowed_dt=self.settings.allowed_dt,
                 logger=self.logger
             )
             # create the task object from all data
@@ -359,7 +360,7 @@ class LocalTaskProcessor:
             shutil.rmtree(task_path)
 
     def _shutdown_or_not(self):
-        if self.settings["shutdown_after_task"]:
+        if self.settings.shutdown_after_task:
             self.logger.info("Task done! Shutting down in 15 seconds")
             os.system("/usr/bin/sleep 15 && /sbin/shutdown -h now")
             os.system("/usr/bin/sleep 15 && /bin/sudo /sbin/shutdown -h now")

@@ -36,41 +36,6 @@ class CallbackUrl(BaseModel):
     token_access: Optional[str] = None
     token_expiration: Optional[datetime] = datetime.now()
 
-    # @field_validator("url")
-    # @classmethod
-    # def validate_url(cls, v):
-    #     try:
-    #         r = requests.get(
-    #             v,
-    #             timeout=5,
-    #         )
-    #     except requests.exceptions.ConnectionError as e:
-    #         raise ValueError(f"Timeout of 5 seconds reached on connection {v} reached")
-    #     return v
-
-    # @model_validator(mode="after")
-    # def check_replace_token(self) -> 'CallbackUrl':
-    #     """
-    #     Upon creating an instance, immediately replace the access tokens by fresh ones, to ensure no security risks
-    #     are occurring. This is only necessary when there is an access token. If not it is assumed the server is local
-    #     and no authentication is required.
-    #
-    #     Returns
-    #     -------
-    #
-    #     """
-    #     if self.has_token:
-    #         # if the token is stored in a file, then it is assumed that this file contains the most actual CallbackUrl
-    #         # for this server, and the entire instance will be replaced
-    #         if os.path.isfile(self.token_file):
-    #             # read contents into a new instance and return that instead of self
-    #             with open(self.token_file, "r") as f:
-    #                 cb_dict = json.loads(f.read())
-    #             self.token_expiration = datetime.strptime(cb_dict["token_expiration"], "%Y-%m-%dT%H:%M:%S.%f")
-    #             self.token_access = cb_dict["token_access"]
-    #             self.token_refresh = cb_dict["token_refresh"]
-    #     return self
-
     @property
     def token_file(self):
         return os.path.join(settings_path, self.server_name + ".json")
@@ -113,13 +78,7 @@ class CallbackUrl(BaseModel):
         self.store_tokens()
 
     def store_tokens(self):
-        """
-        Store the tokens in the active database config record
-
-        Returns
-        -------
-
-        """
+        """Store the tokens in the active database config record."""
         # get the active configuration record
         from .. import db_ops  # import lazily to avoid circular referencing
         from ..db import session  # import lazily to avoid circular referencing

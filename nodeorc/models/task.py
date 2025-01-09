@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator, Field
 from urllib.parse import urljoin
 
 # nodeodm specific imports
-from . import CallbackUrl, Storage, S3Storage, File, Subtask, Callback, REMOVE_FOR_TEMPLATE
+from . import CallbackUrl, Storage, File, Subtask, Callback, REMOVE_FOR_TEMPLATE
 
 
 class Task(BaseModel):
@@ -21,7 +21,7 @@ class Task(BaseModel):
     callback_url: Optional[CallbackUrl] = None
     callback_endpoint_error: str = "/processing/examplevideo/error"
     callback_endpoint_complete: str = "/processing/examplevideo/complete"
-    storage: Optional[Union[S3Storage, Storage]] = None
+    storage: Optional[Union[Storage]] = None
     subtasks: Optional[List[Subtask]] = []
     input_files: Optional[Dict[str, File]] = {}  # files that are needed to perform any subtask
     # files that are produced from the subtask (relative to .tmp location) and remote location

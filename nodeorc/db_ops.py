@@ -6,11 +6,11 @@ import sqlalchemy
 from typing import Optional, Literal
 
 from nodeorc import db
-from nodeorc.models import LocalConfig, RemoteConfig
+from nodeorc.models import LocalConfig
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
-        config: [LocalConfig, RemoteConfig],
+        config: [LocalConfig],
         set_as_active=True
 ):
     """

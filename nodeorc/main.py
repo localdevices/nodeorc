@@ -187,7 +187,7 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = db_ops.get_active_config(session=session, parse=True)
+    active_config = db_ops.get_active_config(session=session, parse=False)
     if not(active_config):
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
@@ -223,7 +223,7 @@ def start():
         logger.info("Checking if a new task form is available for me...")
         new_task_form_row = tasks.request_task_form(
             session=session,
-            callback_url=callback_url,
+            callback_url=callback_url.pydantic,  # pydantic model has more functionalities
             device=device,
             logger=logger
         )
@@ -246,7 +246,7 @@ def start():
             task_form_template=task_form_template,
             logger=logger,
             water_level_config=water_level_config,
-            **active_config.model_dump()
+            config=active_config
         )
         processor.await_task()
     except Exception as e:

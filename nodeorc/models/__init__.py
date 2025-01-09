@@ -18,11 +18,11 @@ def check_datetime_fmt(fn_fmt):
     return True
 
 
-from .storage import Storage, S3Storage, File, get_storage
+from .storage import Storage, File, get_storage
 from .callback_url import CallbackUrl
 from .callback import Callback
 from .subtask import Subtask
 from .task import Task
-from .config import LocalConfig, RemoteConfig, DiskManagement, Settings
+from .config import LocalConfig, DiskManagement, Settings
 
 

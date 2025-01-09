@@ -90,10 +90,6 @@ class Settings(BaseModel):
         check_datetime_fmt(v)
         return v
 
-class RemoteConfig(BaseModel):
-    amqp_connection: AnyHttpUrl
-
-
 class LocalConfig(BaseModel):
     settings: Settings
     storage: Storage
