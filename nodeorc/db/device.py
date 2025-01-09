@@ -9,7 +9,7 @@ from sqlalchemy import Column, Enum, String, DateTime, Float
 from sqlalchemy.orm import Mapped, mapped_column
 
 from nodeorc import __version__
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 
 """Models for device information."""

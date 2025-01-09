@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, DateTime, Float
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 class WaterLevelTimeSeries(Base):
     """

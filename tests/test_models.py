@@ -4,7 +4,7 @@ import json
 import pytest
 import nodeorc.models as orcmodels
 
-from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
+from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
 from nodeorc.db_ops import add_replace_water_level_script, add_water_level
 
 from sqlalchemy import create_engine

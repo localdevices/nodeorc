@@ -3,7 +3,7 @@ import os
 
 from click.testing import CliRunner
 from nodeorc.main import upload_water_level_script
-from nodeorc.db.models import WaterLevelSettings
+from nodeorc.db import WaterLevelSettings
 from nodeorc.db import db_path_config
 
 

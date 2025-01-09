@@ -4,7 +4,7 @@ import json
 
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Integer
-from nodeorc.db.models import Base, sqlalchemy_to_dict
+from nodeorc.db import Base, sqlalchemy_to_dict
 from nodeorc import models
 
 class CallbackUrl(Base):

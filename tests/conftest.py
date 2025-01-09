@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 from nodeorc import models, log
-from nodeorc.db import models as db_models
+from nodeorc import db
 
 
 @pytest.fixture
@@ -17,13 +17,13 @@ def session_empty(tmpdir):
     # Create an in-memory SQLite database for testing; adjust connection string for other databases
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     # Create all tables from metadata (assumes models use SQLAlchemy Base)
-    db_models.Base.metadata.create_all(engine)
+    db.Base.metadata.create_all(engine)
     Session = scoped_session(sessionmaker(bind=engine))
     session = Session()
     yield session
     # Close the session and drop all tables after tests run
     session.close()
-    db_models.Base.metadata.drop_all(engine)
+    db.Base.metadata.drop_all(engine)
 
 
 # Example fixture
@@ -31,24 +31,24 @@ def session_empty(tmpdir):
 def session_config(session_empty, tmpdir):
     session = session_empty
     # Create and add a Device instance
-    device_instance = db_models.Device(
+    device_instance = db.Device(
         # Add relevant fields for the Device model
         name="Test Device",
 
     )
     # Create and add a Settings instance
     # Add test data
-    settings_instance = db_models.Settings(
+    settings_instance = db.Settings(
         parse_dates_from_file=True,
         video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
         allowed_dt=3600,
         shutdown_after_task=False,
         reboot_after=0,
     )
-    storage_instance = db_models.Storage()
-    disk_management_instance = db_models.DiskManagement(home_folder=str(tmpdir))
-    water_level_settings_instance = db_models.WaterLevelSettings()
-    callback_url_instance = db_models.CallbackUrl(server_name="testserver")
+    storage_instance = db.Storage()
+    disk_management_instance = db.DiskManagement(home_folder=str(tmpdir))
+    water_level_settings_instance = db.WaterLevelSettings()
+    callback_url_instance = db.CallbackUrl(server_name="testserver")
     session.add(device_instance)
     session.add(settings_instance)
     session.add(storage_instance)
@@ -58,7 +58,7 @@ def session_config(session_empty, tmpdir):
     # commit to give all an id
     session.commit()
 
-    active_config_instance = db_models.ActiveConfig(
+    active_config_instance = db.ActiveConfig(
         settings_id=settings_instance.id,
         storage_id=storage_instance.id,
         disk_management_id=disk_management_instance.id,
@@ -81,7 +81,7 @@ def session_water_levels(session_config):
     values = list(range(len(timestamps)))
     # make several timestamps to store
     for t, v in zip(timestamps, values):
-        water_level_instance = db_models.WaterLevelTimeSeries(
+        water_level_instance = db.WaterLevelTimeSeries(
             timestamp=t,
             level=v,
         )

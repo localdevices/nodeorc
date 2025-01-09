@@ -9,8 +9,8 @@ from urllib.parse import urljoin
 import uuid
 import json
 
-from ..models import Task
-from ..db.models import TaskForm, TaskFormStatus, DeviceFormStatus
+from nodeorc.models import Task
+from nodeorc.db import TaskForm, TaskFormStatus, DeviceFormStatus
 from .. import utils, __home__
 
 config_file = os.path.join(__home__, "task_form.json")

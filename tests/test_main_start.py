@@ -5,13 +5,7 @@ from click.testing import CliRunner
 from nodeorc.main import start
 
 import pytest
-from nodeorc.db import models as db_models, Session  # Adjust imports based on your project's structure
-
-# engine = create_engine("sqlite:///:memory:")
-# BaseData.metadata.create_all(engine)
-# Session = sessionmaker(bind=engine)
-# session = Session()
-# yield session
+from nodeorc import db
 
 
 @pytest.fixture
@@ -30,7 +24,7 @@ def test_start_successful_execution(runner, session_config, monkeypatch):
     monkeypatch.setattr("os._exit", mock_exit_code)
     result = runner.invoke(start)
     assert result.exit_code == 0
-    assert session_config.query(db_models.Device).count() == 1
+    assert session_config.query(db.Device).count() == 1
     # assert "Device" in result.output
     # assert "is online to run video analyses" in result.output
 

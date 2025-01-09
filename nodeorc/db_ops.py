@@ -1,12 +1,9 @@
-import json
-from datetime import datetime
-
 import sqlalchemy
 
+from datetime import datetime
 from typing import Optional, Literal
 
 from nodeorc import db
-from nodeorc.models import LocalConfig
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
@@ -26,14 +23,14 @@ def add_config(
     -------
 
     """
-    settings_record = db.models.Settings(**config_data["settings"]) if "settings" in config_data else None
-    disk_management_record = db.models.DiskManagement(**config_data["disk_management"]) if "disk_management" in config_data else None
-    storage_record = db.models.Storage(**config_data["storage"]) if "storage" in config_data else None
-    callback_url_record = db.models.CallbackUrl(**config_data["callback_url"]) if "callback_url" in config_data else None
+    settings_record = db.Settings(**config_data["settings"]) if "settings" in config_data else None
+    disk_management_record = db.DiskManagement(**config_data["disk_management"]) if "disk_management" in config_data else None
+    storage_record = db.Storage(**config_data["storage"]) if "storage" in config_data else None
+    callback_url_record = db.CallbackUrl(**config_data["callback_url"]) if "callback_url" in config_data else None
     # if "storage" in config_data:
     #     storage = config_data["storage"]
     #     storage.pop("options")  # get rid of options parameter, not relevant for dbase
-    #     storage_record = db.models.Storage(**storage)
+    #     storage_record = db.Storage(**storage)
     # else:
     #     storage_record = None
     #
@@ -41,7 +38,7 @@ def add_config(
     # if "callback_url" in config_data:
     #     url = config_data["callback_url"]
     #     url["url"] = str(url["url"])
-    #     callback_url_record = db.models.CallbackUrl(**url)
+    #     callback_url_record = db.CallbackUrl(**url)
     # else
     #     callback_url_record = None
     session.add(settings_record) if settings_record else None
@@ -68,7 +65,7 @@ def add_replace_active_config(
         callback_url_record=None
 ):
     """Set config as the currently active config."""
-    active_configs = session.query(db.models.ActiveConfig)
+    active_configs = session.query(db.ActiveConfig)
     if len(active_configs.all()) == 0:
         # check if all records are present
         assert(
@@ -80,7 +77,7 @@ def add_replace_active_config(
         ]
         ), "No active configuration available yet, you need to supply settings, disk_management, storage and callback_url in your configuration. One or more are missing."
         # no active config yet, make a new one
-        active_config_record = db.models.ActiveConfig(
+        active_config_record = db.ActiveConfig(
             settings_id=settings_record.id,
             disk_management_id=disk_management_record.id,
             storage_id=storage_record.id,
@@ -103,7 +100,7 @@ def add_replace_active_config(
     return active_config_record
 
 from sqlalchemy.orm import Session
-from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries
+from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries
 
 
 def add_replace_water_level_script(
@@ -176,35 +173,26 @@ def get_settings(session, id):
 
     Parameters
     ----------
-    config_record : db.models.Config
+    config_record : db.Config
         configuration
 
     Returns
     -------
 
     """
-    return session.query(db.models.Settings).get(id)
+    return session.query(db.Settings).get(id)
 
 
-def get_active_config(session=db.session, parse=False):
-    active_configs = session.query(db.models.ActiveConfig)
+def get_active_config(session=db.session):
+    active_configs = session.query(db.ActiveConfig)
     if len(active_configs.all()) == 0:
         return None
     active_config = active_configs.first()
-    if parse:
-        # parse into a Config object (TODO, also add RemoteConfig options)
-        config_dict = {}
-        for attr in ["settings", "storage", "callback_url", "disk_management"]:
-            c = getattr(active_config, attr).__dict__
-            c.pop("_sa_instance_state")
-            c.pop("id")
-            config_dict[attr] = c
-        return LocalConfig(**config_dict)
     return active_config
 
 
 def get_active_task_form(session, parse=False, allow_candidate=True):
-    query = session.query(db.models.TaskForm)
+    query = session.query(db.TaskForm)
     if len(query.all()) == 0:
         # there are no task forms yet, return None
         return None
@@ -213,7 +201,7 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
     get_accepted = True
     if allow_candidate:
         # first check for a candidate
-        query_candidate = query.filter_by(status=db.models.TaskFormStatus.CANDIDATE)
+        query_candidate = query.filter_by(status=db.TaskFormStatus.CANDIDATE)
         if len(query_candidate.all()) > 0:
             # accepted task form not needed
             get_accepted = False
@@ -221,7 +209,7 @@ def get_active_task_form(session, parse=False, allow_candidate=True):
 
     if get_accepted:
         # find the single task form that is active
-        query = query.filter_by(status=db.models.TaskFormStatus.ACCEPTED)
+        query = query.filter_by(status=db.TaskFormStatus.ACCEPTED)
         if len(query.all()) == 0:
             return None
     task_form = query.first()
@@ -242,7 +230,7 @@ def get_water_level_config(session):
 def patch_active_config_to_accepted():
     """If active config is still CANDIDATE, upgrade to ACCEPTED """
     task_form_row = get_active_task_form(db.session)
-    if task_form_row.status == db.models.TaskFormStatus.CANDIDATE:
+    if task_form_row.status == db.TaskFormStatus.CANDIDATE:
         # also retrieve the accepted
         task_form_row_accepted = get_active_task_form(
             db.session,
@@ -250,13 +238,13 @@ def patch_active_config_to_accepted():
         )
         # now change the statusses
         if task_form_row_accepted:  # it may also be that there are no ACCEPTED forms yet
-            task_form_row_accepted.status = db.models.TaskFormStatus.ANCIENT
-        task_form_row.status = db.models.TaskFormStatus.ACCEPTED
+            task_form_row_accepted.status = db.TaskFormStatus.ANCIENT
+        task_form_row.status = db.TaskFormStatus.ACCEPTED
         db.session.commit()
 
 
 def get_data_folder():
-    config = get_active_config(parse=False)
+    config = get_active_config()
     if config:
         return config.disk_management.home_folder
     return None

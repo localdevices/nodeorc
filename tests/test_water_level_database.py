@@ -1,9 +1,7 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta
 
 import pytest
-from nodeorc.db.models import WaterLevelTimeSeries
 from nodeorc.db_ops import get_water_level
-from sqlalchemy.orm import Session
 
 
 def test_get_water_level_returns_closest_record(session_water_levels):

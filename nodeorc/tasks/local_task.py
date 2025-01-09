@@ -17,7 +17,7 @@ from nodeorc.tasks import request_task_form
 from nodeorc import models, disk_mng, db, db_ops, utils, water_level
 
 session = db_ops.get_session()
-device = session.query(db.models.Device).first()
+device = session.query(db.Device).first()
 
 REPLACE_ARGS = ["input_files", "output_files", "storage", "callbacks"]
 
@@ -30,7 +30,7 @@ class LocalTaskProcessor:
             # settings: models.Settings,
             water_level_config: dict,
             # disk_management: db_models.DiskManagement,
-            config: db.models.ActiveConfig,
+            config: db.ActiveConfig,
             max_workers: int = 1,
             auto_start_threads: bool = True,
             logger=logging,
@@ -421,7 +421,7 @@ class LocalTaskProcessor:
         Try to post remaining non-posted callbacks and change their states in database
         if successful
         """
-        callback_records = session.query(db.models.Callback)
+        callback_records = session.query(db.Callback)
         callbacks = [cb.callback for cb in callback_records]
         # send off
         success = True

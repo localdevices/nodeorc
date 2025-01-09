@@ -3,7 +3,7 @@
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean
 from sqlalchemy.orm import validates
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 
 class Settings(Base):

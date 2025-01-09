@@ -6,7 +6,7 @@ from sqlalchemy import event, Column, String, DateTime, Integer, Float, Enum
 from sqlalchemy.orm import validates
 
 from nodeorc import water_level
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 class WaterLevelSettings(Base):
     __tablename__ = "water_level"
