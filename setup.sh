@@ -424,8 +424,6 @@ setup_nodeorc_config(){
     "settings": {
         "parse_dates_from_file": true,
         "video_file_fmt": "{%Y%m%d_%H%M%S}.mp4",
-        "water_level_fmt": "all_levels.txt",
-        "water_level_datetimefmt": "%Y%m%d_%H%M%S",
         "allowed_dt": 3600,
         "shutdown_after_task": false,
         "reboot_after": 86400

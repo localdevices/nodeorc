@@ -51,7 +51,7 @@ class Settings(Base):
         return "{}".format(self.__str__())
 
     @validates("video_file_fmt")
-    def check_video_fmt(cls, value):
+    def check_video_fmt(cls, key, value):
         # check string within {}, see if that can be parsed to datetime
         check_datetime_fmt(value)
         return value

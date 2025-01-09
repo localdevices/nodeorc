@@ -10,7 +10,7 @@ from nodeorc.models import LocalConfig
 
 def add_config(
         session: sqlalchemy.orm.session.Session,
-        config: [LocalConfig],
+        config_data: dict,
         set_as_active=True
 ):
     """
@@ -18,29 +18,36 @@ def add_config(
 
     Parameters
     ----------
-    session
-    config
-    set_as_active
+    session : sqlalchemy.orm.session.Session
+    config_data : dict
+    set_as_active : bool
 
     Returns
     -------
 
     """
-    config_dict = json.loads(config.to_json())
-
-    settings_record = db.models.Settings(**config_dict["settings"])
-    disk_management_record = db.models.DiskManagement(**config_dict["disk_management"])
-    storage = config_dict["storage"]
-    storage.pop("options")  # get rid of options parameter, not relevant for dbase
-    storage_record = db.models.Storage(**config_dict["storage"])
-    # callback_url_record = db_models.CallbackUrl(**config_dict["callback_url"])
-    url = config.callback_url.model_dump()
-    url["url"] = str(url["url"])
-    callback_url_record = db.models.CallbackUrl(**url)
-    session.add(settings_record)
-    session.add(disk_management_record)
-    session.add(storage_record)
-    session.add(callback_url_record)
+    settings_record = db.models.Settings(**config_data["settings"]) if "settings" in config_data else None
+    disk_management_record = db.models.DiskManagement(**config_data["disk_management"]) if "disk_management" in config_data else None
+    storage_record = db.models.Storage(**config_data["storage"]) if "storage" in config_data else None
+    callback_url_record = db.models.CallbackUrl(**config_data["callback_url"]) if "callback_url" in config_data else None
+    # if "storage" in config_data:
+    #     storage = config_data["storage"]
+    #     storage.pop("options")  # get rid of options parameter, not relevant for dbase
+    #     storage_record = db.models.Storage(**storage)
+    # else:
+    #     storage_record = None
+    #
+    # # callback_url_record = db_models.CallbackUrl(**config_dict["callback_url"])
+    # if "callback_url" in config_data:
+    #     url = config_data["callback_url"]
+    #     url["url"] = str(url["url"])
+    #     callback_url_record = db.models.CallbackUrl(**url)
+    # else
+    #     callback_url_record = None
+    session.add(settings_record) if settings_record else None
+    session.add(disk_management_record) if disk_management_record else None
+    session.add(storage_record) if storage_record else None
+    session.add(callback_url_record) if callback_url_record else None
     session.commit()
     if set_as_active:
         active_config_record = add_replace_active_config(
