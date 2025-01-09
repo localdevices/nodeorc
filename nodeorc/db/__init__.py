@@ -3,9 +3,8 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base, Device, Settings
-from . import active_config
-from .. import __home__
+from nodeorc.db.models import Base, Device, Settings
+from nodeorc import __home__
 
 db_path_config = os.path.join(
     __home__, "nodeorc_config.db"

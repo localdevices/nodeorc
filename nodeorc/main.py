@@ -11,7 +11,7 @@ from nodeorc import db, log, models, db_ops, tasks, settings_path, utils, __vers
 
 session = db_ops.get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
-active_config = db_ops.get_active_config(parse=True)
+active_config = db_ops.get_active_config(parse=False)
 if active_config:
     log_path = active_config.disk_management.log_path
 else:
@@ -47,11 +47,13 @@ def load_config(config_fn):
     if os.path.isfile(config_fn):
         try:
             with open(config_fn, "r") as f:
-                settings = models.LocalConfig(**json.load(f))
-            return settings
+                config_data = json.load(f)
+                return config_data
         except ValidationError as e:
             raise ValueError(
                 f"Settings file in {os.path.abspath(config_fn)} contains errors. Error: {e}")
+    else:
+        raise FileNotFoundError(f"Settings file {os.path.abspath(config_fn)} not found.")
 
 
 def validate_env(env_var):
@@ -187,8 +189,8 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = db_ops.get_active_config(session=session, parse=True)
-    if not(active_config):
+    active_config = db_ops.get_active_config(session=session, parse=False)
+    if not active_config:
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
             'through the CLI. Type "nodeorc upload-config --help" for more information'
@@ -223,7 +225,7 @@ def start():
         logger.info("Checking if a new task form is available for me...")
         new_task_form_row = tasks.request_task_form(
             session=session,
-            callback_url=callback_url,
+            callback_url=callback_url.pydantic,  # pydantic model has more functionalities
             device=device,
             logger=logger
         )
@@ -246,7 +248,7 @@ def start():
             task_form_template=task_form_template,
             logger=logger,
             water_level_config=water_level_config,
-            **active_config.model_dump()
+            config=active_config
         )
         processor.await_task()
     except Exception as e:
@@ -272,9 +274,10 @@ def start():
 )
 def upload_config(json_file, set_as_active):
     """Upload a new configuration for this device from a JSON formatted file"""
+    session = db_ops.get_session()
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
-    config_ = load_config(json_file)
-    rec = db_ops.add_config(session, config=config_, set_as_active=set_as_active)
+    config_data = load_config(json_file)
+    rec = db_ops.add_config(session, config_data=config_data, set_as_active=set_as_active)
     logger.info(f"Settings updated successfully to {rec}")
 
 @cli.command(

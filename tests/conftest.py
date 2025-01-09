@@ -10,9 +10,9 @@ from sqlalchemy.pool import StaticPool
 from nodeorc import models, log
 from nodeorc.db import models as db_models
 
-# Example fixture
+
 @pytest.fixture
-def session_config(tmpdir):
+def session_empty(tmpdir):
     db_path = ":memory:" #?cache=shared"
     # Create an in-memory SQLite database for testing; adjust connection string for other databases
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -20,52 +20,57 @@ def session_config(tmpdir):
     db_models.Base.metadata.create_all(engine)
     Session = scoped_session(sessionmaker(bind=engine))
     session = Session()
-    try:
-        # Create and add a Device instance
-        device_instance = db_models.Device(
-            # Add relevant fields for the Device model
-            name="Test Device",
+    yield session
+    # Close the session and drop all tables after tests run
+    session.close()
+    db_models.Base.metadata.drop_all(engine)
 
-        )
-        # Create and add a Settings instance
-        # Add test data
-        settings_instance = db_models.Settings(
-            parse_dates_from_file=True,
-            video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
-            allowed_dt=3600,
-            shutdown_after_task=False,
-            reboot_after=0,
-        )
-        storage_instance = db_models.Storage()
-        disk_management_instance = db_models.DiskManagement(home_folder=str(tmpdir))
-        water_level_settings_instance = db_models.WaterLevelSettings()
-        callback_url_instance = db_models.CallbackUrl(server_name="testserver")
-        session.add(device_instance)
-        session.add(settings_instance)
-        session.add(storage_instance)
-        session.add(disk_management_instance)
-        session.add(water_level_settings_instance)
-        session.add(callback_url_instance)
-        # commit to give all an id
-        session.commit()
 
-        active_config_instance = db_models.ActiveConfig(
-            settings_id=settings_instance.id,
-            storage_id=storage_instance.id,
-            disk_management_id=disk_management_instance.id,
-            callback_url_id=callback_url_instance.id,
+# Example fixture
+@pytest.fixture
+def session_config(session_empty, tmpdir):
+    session = session_empty
+    # Create and add a Device instance
+    device_instance = db_models.Device(
+        # Add relevant fields for the Device model
+        name="Test Device",
 
-        )
-        session.add(active_config_instance)
-        # Commit the session to save changes
-        session.commit()
+    )
+    # Create and add a Settings instance
+    # Add test data
+    settings_instance = db_models.Settings(
+        parse_dates_from_file=True,
+        video_file_fmt="video_{%Y%m%dT%H%M%S}.mp4",
+        allowed_dt=3600,
+        shutdown_after_task=False,
+        reboot_after=0,
+    )
+    storage_instance = db_models.Storage()
+    disk_management_instance = db_models.DiskManagement(home_folder=str(tmpdir))
+    water_level_settings_instance = db_models.WaterLevelSettings()
+    callback_url_instance = db_models.CallbackUrl(server_name="testserver")
+    session.add(device_instance)
+    session.add(settings_instance)
+    session.add(storage_instance)
+    session.add(disk_management_instance)
+    session.add(water_level_settings_instance)
+    session.add(callback_url_instance)
+    # commit to give all an id
+    session.commit()
 
-        yield session  # Provide the session to tests
+    active_config_instance = db_models.ActiveConfig(
+        settings_id=settings_instance.id,
+        storage_id=storage_instance.id,
+        disk_management_id=disk_management_instance.id,
+        callback_url_id=callback_url_instance.id,
 
-    finally:
-        # Close the session and drop all tables after tests run
-        session.close()
-        db_models.Base.metadata.drop_all(engine)
+    )
+    session.add(active_config_instance)
+    # Commit the session to save changes
+    session.commit()
+
+    return session  # Provide the session to tests
+
 
 
 @pytest.fixture

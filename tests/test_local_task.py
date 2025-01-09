@@ -32,11 +32,11 @@ def water_level_config(session_config):
 
 
 @pytest.fixture
-def local_task_processor(session_config, callback_url, storage, settings, disk_management, water_level_config, logger):
+def local_task_processor(session_config, settings, water_level_config, logger):
     task_form_template = MagicMock()
     water_level_config = utils.model_to_dict(water_level_config)
-    active_config = db_ops.get_active_config(session=session_config, parse=True)
-    active_config = active_config.model_dump()
+    active_config = db_ops.get_active_config(session=session_config, parse=False)
+    # active_config = active_config.model_dump()
     # callback_url = MagicMock(spec=CallbackUrl)
     # storage = MagicMock(spec=Storage)
     # settings = MagicMock(spec=Settings)
@@ -48,9 +48,13 @@ def local_task_processor(session_config, callback_url, storage, settings, disk_m
         logger=logger,
         water_level_config=water_level_config,
         auto_start_threads=False,
-        **active_config,
+        config=active_config,
     )
 
+@pytest.fixture
+def local_task_processor_shutdown(local_task_processor):
+    local_task_processor.settings.shutdown_after_task = True
+    return local_task_processor
 
 def test_await_task(tmpdir, local_task_processor, mocker):
     mocker.patch("nodeorc.disk_mng.scan_folder", return_value=[str(tmpdir / "video_20000101T000000.mp4")])
@@ -186,11 +190,10 @@ def test_set_results_to_final_path(local_task_processor, tmpdir):
         )
 
 
-def test_shutdown_or_not(local_task_processor):
+def test_shutdown_or_not(local_task_processor_shutdown):
     # set settings
-    local_task_processor.settings["shutdown_after_task"] = True
     with patch("os.system", return_value=None) as mock_shutdown:
-        local_task_processor._shutdown_or_not()
+        local_task_processor_shutdown._shutdown_or_not()
         assert mock_shutdown.called
 
 

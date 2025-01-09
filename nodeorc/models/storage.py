@@ -10,7 +10,6 @@ from .. import callbacks, utils
 class Storage(BaseModel):
     url: str = "./tmp"
     bucket_name: str = "video"
-    options: Dict = {}
     @property
     def bucket(self):
         return os.path.join(self.url, self.bucket_name)
@@ -75,46 +74,6 @@ class Storage(BaseModel):
                 trg
             )
 
-class S3Storage(BaseModel):
-    url: AnyHttpUrl = "http://127.0.0.1:9000"
-    bucket_name: str = "video"
-    options: Dict[str, Any] = {}
-
-
-    @property
-    def bucket(self):
-        return utils.get_bucket(
-            url=str(self.url),
-            bucket_name=self.bucket_name,
-            **self.options
-        )
-
-    def upload_io(self, obj, dest, **kwargs):
-        utils.upload_io(obj, self.bucket, dest=dest, **kwargs)
-
-    def download_file(self, src, trg, keep_src=True):
-        """
-        Download file from bucket to specified target file (entire path inc. filename)
-
-        Parameters
-        ----------
-        src : str
-            file within bucket
-
-        trg : file as it should be named locally
-
-        Returns
-        -------
-
-        """
-        dirname = os.path.dirname(trg)
-        if not os.path.isdir(dirname):
-            os.makedirs(dirname)
-
-        self.bucket.download_file(src, trg)
-
-
-
 class File(BaseModel):
     """
     Definition of the location, naming of raw result on tmp location, and in/output file name for cloud storage
@@ -144,9 +103,5 @@ class File(BaseModel):
 
 
 def get_storage(**data):
-    if data.get("url"):
-        if "://" in data["url"]:
-            return S3Storage(**data)
-        else:
-            return Storage(**data)
+    return Storage(**data)
 
