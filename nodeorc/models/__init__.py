@@ -23,6 +23,5 @@ from .callback_url import CallbackUrl
 from .callback import Callback
 from .subtask import Subtask
 from .task import Task
-from .config import LocalConfig, DiskManagement, Settings
 
 

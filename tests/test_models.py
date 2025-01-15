@@ -4,7 +4,7 @@ import json
 import pytest
 import nodeorc.models as orcmodels
 
-from nodeorc.db.models import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
+from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
 from nodeorc.db_ops import add_replace_water_level_script, add_water_level
 
 from sqlalchemy import create_engine
@@ -57,6 +57,7 @@ def test_add_new_water_level_record(session, script):
     water_level = add_replace_water_level_script(
         session=session,
         script=script,
+        script_type='BASH',
         file_template=file_template,
         frequency=frequency,
         datetime_fmt=datetime_fmt,
@@ -70,7 +71,7 @@ def test_add_new_water_level_record(session, script):
 
 def test_add_new_water_level_record_python(session, python_script):
     file_template = "file_{datetime}.txt"
-    script_type = 'python'
+    script_type = 'PYTHON'
     frequency = 10.5
     datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -99,6 +100,7 @@ def test_update_existing_water_level_record(session, script, new_script):
     # Add initial record
     water_level = WaterLevelSettings(
         script=script,
+        script_type='BASH',
         file_template=file_template,
         frequency=frequency,
         datetime_fmt=datetime_fmt,
@@ -114,6 +116,7 @@ def test_update_existing_water_level_record(session, script, new_script):
     updated_water_level = add_replace_water_level_script(
         session=session,
         script=new_script,
+        script_type="BASH",
         file_template=new_file_template,
         frequency=new_frequency,
         datetime_fmt=new_datetime_fmt,

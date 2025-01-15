@@ -11,7 +11,7 @@ from nodeorc import db, log, models, db_ops, tasks, settings_path, utils, __vers
 
 session = db_ops.get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
-active_config = db_ops.get_active_config(parse=False)
+active_config = db_ops.get_active_config()
 if active_config:
     log_path = active_config.disk_management.log_path
 else:
@@ -28,16 +28,16 @@ load_dotenv()
 # temp_path = os.getenv("TEMP_PATH", "./tmp")
 # settings_path = os.path.join(os.path.split(__file__)[0], "..", "settings")
 
-device = session.query(db.models.Device).first()
+device = session.query(db.Device).first()
 
 def get_docs_settings():
     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
     # list all attributes except internal and fixed fields
-    fields = [f for f in dir(db.models.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
+    fields = [f for f in dir(db.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
     docs = """JSON-file should contain the following settings: \n"""
     docs += """================================================\n\n"""
     for f in fields:
-        attr_doc = getattr(db.models.ActiveConfig, f).comment
+        attr_doc = getattr(db.ActiveConfig, f).comment
         docs += " {} : {}\n\n".format(f[:-3], attr_doc)
     return docs
 
@@ -189,7 +189,7 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = db_ops.get_active_config(session=session, parse=False)
+    active_config = db_ops.get_active_config(session=session)
     if not active_config:
         raise click.UsageError(
             'You do not yet have an active configuration. Upload an activate configuration '
@@ -240,8 +240,8 @@ def start():
         )
         # This only happens with version upgrades. Update the status to BROKEN and report back to platform
         task_form_template = db_ops.get_active_task_form(session, parse=False)
-        task_form_template.status = db.models.TaskFormStatus.BROKEN
-        device.form_status = db.models.DeviceFormStatus.BROKEN_FORM
+        task_form_template.status = db.TaskFormStatus.BROKEN
+        device.form_status = db.DeviceFormStatus.BROKEN_FORM
         session.commit()
     try:
         processor = tasks.LocalTaskProcessor(
@@ -294,10 +294,10 @@ def upload_config(json_file, set_as_active):
 @click.option(
     "-t",
     "--script-type",
-    type=click.Choice(["python", "bash"]),
-    default="bash",
+    type=click.Choice(["PYTHON", "BASH"]),
+    default="BASH",
     show_default=True,
-    help="Script type (either 'python' or 'bash')",
+    help="Script type (either 'PYTHON' or 'BASH')",
 )
 @click.option(
     "-f",
@@ -327,6 +327,7 @@ def upload_config(json_file, set_as_active):
     show_default=True,
 )
 def upload_water_level_script(script, script_type, file_template, frequency, datetime_fmt):
+    session = db_ops.get_session()
     logger.info(f"Device {str(device)} receiving new water level script configuration. Script must provide ")
     logger.info(
         "valid outputs. If API is called, ensure a valid response is returned and you are connected to internet."
@@ -341,7 +342,6 @@ def upload_water_level_script(script, script_type, file_template, frequency, dat
         datetime_fmt
     )
     logger.info(f"Settings updated successfully to {rec}")
-
 
 # def main():
 #     connection = pika.BlockingConnection(

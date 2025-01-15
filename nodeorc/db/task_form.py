@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, Enum, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 class TaskFormStatus(enum.Enum):
     NEW = 1  # task form that does not pass through validation

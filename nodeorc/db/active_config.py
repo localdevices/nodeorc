@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.orm import relationship
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 
 class ActiveConfig(Base):

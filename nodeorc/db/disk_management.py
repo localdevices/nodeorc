@@ -4,7 +4,7 @@ import os
 
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Float, Integer
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 from sqlalchemy.orm import validates
 
 class DiskManagement(Base):

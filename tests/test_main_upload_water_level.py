@@ -3,7 +3,7 @@ import os
 
 from click.testing import CliRunner
 from nodeorc.main import upload_water_level_script
-from nodeorc.db.models import WaterLevelSettings
+from nodeorc.db import WaterLevelSettings
 from nodeorc.db import db_path_config
 
 
@@ -12,9 +12,10 @@ def get_session_config():
     return session
 
 
-def test_upload_water_level_script_success(tmp_path):
+def test_upload_water_level_script_success(tmp_path, session_empty, monkeypatch):
     """Test successful execution of upload_water_level_script with valid inputs."""
-    session_config = get_session_config()
+    monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_empty)
+    # session_config = get_session_config()
     test_script_path = tmp_path / "test_script.py"
     test_script_path.write_text("print('2023-11-01T12:34:56Z,78.90')")
 
@@ -23,14 +24,14 @@ def test_upload_water_level_script_success(tmp_path):
         upload_water_level_script,
         [
             "--script", str(test_script_path),
-            "--script-type", "python",
+            "--script-type", "PYTHON",
             "--file-template", "wl_{%Y%m%d}.txt",
             "--frequency", "600",
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
         ]
     )
     # check if record was indeed added
-    record = session_config.query(WaterLevelSettings).all()
+    record = session_empty.query(WaterLevelSettings).all()
     assert len(record) == 1
     assert result.exit_code == 0
     assert "Created new WaterLevel record with" in result.output
@@ -64,7 +65,7 @@ def test_upload_water_level_script_invalid_file_template(tmp_path):
         upload_water_level_script,
         [
             "--script", str(test_script_path),
-            "--script-type", "python",
+            "--script-type", "PYTHON",
             "--file-template", "invalid_template",
             "--frequency", "600",
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
@@ -86,7 +87,7 @@ def test_upload_water_level_script_invalid_frequency(tmp_path):
         upload_water_level_script,
         [
             "--script", str(test_script_path),
-            "--script-type", "python",
+            "--script-type", "PYTHON",
             "--file-template", "wl_{%Y%m%d}.txt",
             "--frequency", "-10",
             "--datetime-fmt", "%Y-%m-%dT%H:%M:%SZ",
@@ -108,7 +109,7 @@ def test_upload_water_level_script_invalid_datetime_format(tmp_path):
         upload_water_level_script,
         [
             "--script", str(test_script_path),
-            "--script-type", "python",
+            "--script-type", "PYTHON",
             "--file-template", "wl_{%Y%m%d}.txt",
             "--frequency", "600",
             "--datetime-fmt", "invalid_format",

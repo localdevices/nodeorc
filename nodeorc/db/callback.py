@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, DateTime, JSON
 
 from nodeorc import models
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 
 
 class Callback(Base):

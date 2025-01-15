@@ -5,7 +5,7 @@ import shutil
 
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Integer
-from nodeorc.db.models import Base
+from nodeorc.db import Base
 import nodeorc.models as models
 
 class Storage(Base):

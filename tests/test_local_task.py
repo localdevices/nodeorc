@@ -5,7 +5,7 @@ import pytest
 from datetime import datetime, UTC, timedelta
 from unittest.mock import MagicMock, patch
 
-from nodeorc.db.models import CallbackUrl, Storage, Settings, DiskManagement, WaterLevelSettings, WaterLevelTimeSeries
+from nodeorc.db import CallbackUrl, Storage, Settings, DiskManagement, WaterLevelSettings, WaterLevelTimeSeries
 from nodeorc.tasks.local_task import LocalTaskProcessor, get_water_level
 from nodeorc import utils, db_ops
 
@@ -30,12 +30,11 @@ def water_level_config(session_config):
     return session_config.query(WaterLevelSettings).first()
 
 
-
 @pytest.fixture
 def local_task_processor(session_config, settings, water_level_config, logger):
     task_form_template = MagicMock()
     water_level_config = utils.model_to_dict(water_level_config)
-    active_config = db_ops.get_active_config(session=session_config, parse=False)
+    active_config = db_ops.get_active_config(session=session_config)
     # active_config = active_config.model_dump()
     # callback_url = MagicMock(spec=CallbackUrl)
     # storage = MagicMock(spec=Storage)

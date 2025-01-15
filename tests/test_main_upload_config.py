@@ -3,7 +3,7 @@ import pytest
 
 from click.testing import CliRunner
 from nodeorc.main import upload_config
-from nodeorc.db import models as db_models
+from nodeorc import db
 
 @pytest.fixture
 def config_file(tmpdir):
@@ -59,4 +59,4 @@ def test_start_successful_execution(runner, session_empty, config_file, monkeypa
     monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_empty)
     result = runner.invoke(upload_config, [str(config_file)])
     assert result.exit_code == 0
-    assert session_empty.query(db_models.Settings).count() == 1
+    assert session_empty.query(db.Settings).count() == 1
