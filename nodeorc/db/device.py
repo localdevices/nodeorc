@@ -24,8 +24,8 @@ class DeviceStatus(enum.Enum):
 class DeviceFormStatus(enum.Enum):
     NOFORM = 0  # set at start of device.
     VALID_FORM = 1 # Valid form available
-    INVALID_FORM = 1  # if only an invalid form is available
-    BROKEN_FORM = 2  # if a valid form used to exist but now is invalid due to system/software changes
+    INVALID_FORM = 2  # if only an invalid form is available
+    BROKEN_FORM = 3  # if a valid form used to exist but now is invalid due to system/software changes
 
 
 class Device(Base):
@@ -74,16 +74,15 @@ class Device(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-    @property
-    def as_dict(self):
-        device_info = {
-            key: value for key, value in self.__dict__.items() if not key.startswith('_') and not callable(value)
-        }
-        # replace the datetime by a time string
-        device_info["created_at"] = self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        device_info["id"] = str(self.id)
-        device_info["status"] = self.status.value
-        device_info["form_status"] = self.form_status.value
-        device_info["nodeorc_version"] = self.nodeorc_version
-        return device_info
-
+    # @property
+    # def as_dict(self):
+    #     device_info = {
+    #         key: value for key, value in self.__dict__.items() if not key.startswith('_') and not callable(value)
+    #     }
+    #     # replace the datetime by a time string
+    #     device_info["created_at"] = self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    #     device_info["id"] = str(self.id)
+    #     device_info["status"] = self.status.value
+    #     device_info["form_status"] = self.form_status.value
+    #     device_info["nodeorc_version"] = self.nodeorc_version
+    #     return device_info

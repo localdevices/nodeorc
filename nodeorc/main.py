@@ -294,10 +294,10 @@ def upload_config(json_file, set_as_active):
 @click.option(
     "-t",
     "--script-type",
-    type=click.Choice(["python", "bash"]),
-    default="bash",
+    type=click.Choice(["PYTHON", "BASH"]),
+    default="BASH",
     show_default=True,
-    help="Script type (either 'python' or 'bash')",
+    help="Script type (either 'PYTHON' or 'BASH')",
 )
 @click.option(
     "-f",
@@ -327,6 +327,7 @@ def upload_config(json_file, set_as_active):
     show_default=True,
 )
 def upload_water_level_script(script, script_type, file_template, frequency, datetime_fmt):
+    session = db_ops.get_session()
     logger.info(f"Device {str(device)} receiving new water level script configuration. Script must provide ")
     logger.info(
         "valid outputs. If API is called, ensure a valid response is returned and you are connected to internet."
@@ -341,7 +342,6 @@ def upload_water_level_script(script, script_type, file_template, frequency, dat
         datetime_fmt
     )
     logger.info(f"Settings updated successfully to {rec}")
-
 
 # def main():
 #     connection = pika.BlockingConnection(

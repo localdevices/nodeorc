@@ -106,7 +106,7 @@ from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries
 def add_replace_water_level_script(
     session: Session,
     script: Optional[str] = None,
-    script_type: Optional[Literal["python", "bash"]] = None,
+    script_type: Optional[Literal["PYTHON", "BASH"]] = None,
     file_template: Optional[str] = None,
     frequency: Optional[float] = None,
     datetime_fmt: Optional[str] = None
@@ -120,7 +120,7 @@ def add_replace_water_level_script(
         Active SQLAlchemy database session
     script : str, optional
         content of the script to save in WaterLevel
-    script_type : str, optional ["python", "bash"]
+    script_type : str, optional ["PYTHON", "BASH"]
         Type of script
     file_template : str, optional
         template of the file to associate with the record, possibly containing datetime placeholder in curly braces

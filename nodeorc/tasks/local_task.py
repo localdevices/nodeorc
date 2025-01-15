@@ -156,7 +156,7 @@ class LocalTaskProcessor:
                     self.logger.info("Checking for water levels.")
                     timestamp, level = water_level.execute_water_level_script(
                         script=self.water_level_config["script"],
-                        script_type=self.water_level_config["script_type"],
+                        script_type=self.water_level_config["script_type"].name,
                     )
                     self.logger.info(f"Water level found for timestamp {timestamp} with value {level}. Will add to database if not already existing.")
                     db_ops.add_water_level(session=session, timestamp=timestamp, level=level)

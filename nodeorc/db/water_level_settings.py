@@ -1,4 +1,5 @@
 """Model for water level settings."""
+import enum
 import re
 
 from datetime import datetime
@@ -7,6 +8,10 @@ from sqlalchemy.orm import validates
 
 from nodeorc import water_level
 from nodeorc.db import Base
+
+class ScriptType(enum.Enum):
+    PYTHON = 0
+    BASH = 1
 
 class WaterLevelSettings(Base):
     __tablename__ = "water_level"
@@ -31,9 +36,9 @@ class WaterLevelSettings(Base):
                 "water level entries will be added to the database, using the scripts. "
     )
     script_type = Column(
-        Enum("python", "bash"),
-        default="bash",
-        comment="Type of script used to retrieve water level data from the device or API. Either 'python' or 'bash'."
+        Enum(ScriptType),
+        default=ScriptType.BASH,
+        comment="Type of script used to retrieve water level data from the device or API. Either 'PYTHON' or 'BASH'."
     )
     script = Column(
         String,
@@ -110,4 +115,5 @@ def validate_script(mapper, connection, target):
             raise ValueError(
                 f"Error while validating script: {str(e)}"
             )
+    print("Script validated successfully.")
 

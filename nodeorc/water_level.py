@@ -74,7 +74,7 @@ def check_script_security(script_content):
 
 def execute_water_level_script(
         script: str,
-        script_type: Literal["bash", "python"] = "bash"
+        script_type: Literal["BASH", "PYTHON"] = "PYTHON"
 ):
     """Execute a Python or bash script and retrieve the last line of its output as the result.
 
@@ -86,8 +86,8 @@ def execute_water_level_script(
     script : str
         script content (python or bash) to execute. Script must produce a line of output in the format
         %Y-%m-%dT%H:%M:%SZ,<float_value>
-    script_type : str, optional {'bash', 'python'}
-        by default "bash"
+    script_type : str, optional {'BASH', 'PYTHON'}
+        by default "PYTHON"
     dt : datetime, optional
         datetime to be passed to the script as mandatory argument, by default datetime.now(UTC)
 
@@ -103,8 +103,10 @@ def execute_water_level_script(
     RuntimeError
         If the script execution fails.
     """
+    if script_type is None:
+        script_type = "PYTHON"
     try:
-        if script_type == "python":
+        if script_type.upper() == "PYTHON":
             output = subprocess.check_output(
                 [sys.executable, "-c", script],
                 text=True

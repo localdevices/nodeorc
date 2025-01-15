@@ -13,7 +13,7 @@ def test_execute_script_valid_output(monkeypatch):
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
-    result = execute_water_level_script("dummy_script.sh")
+    result = execute_water_level_script("dummy_script.sh", script_type="BASH")
     assert isinstance(result, tuple)
     assert isinstance(result[0], datetime.datetime)
     assert result[0] == datetime.datetime(2023, 11, 1, 12, 34, 56)
@@ -29,7 +29,7 @@ def test_execute_script_invalid_format(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
     with pytest.raises(ValueError, match="Invalid result format"):
-        execute_water_level_script("dummy_script.sh")
+        execute_water_level_script("dummy_script.sh", script_type="BASH")
 
 
 def test_execute_script_invalid_datetime(monkeypatch):
@@ -40,7 +40,7 @@ def test_execute_script_invalid_datetime(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
     with pytest.raises(ValueError, match="Invalid result format"):
-        execute_water_level_script("dummy_script.sh")
+        execute_water_level_script("dummy_script.sh", script_type="BASH")
 
 
 def test_execute_script_invalid_float(monkeypatch):
@@ -51,24 +51,24 @@ def test_execute_script_invalid_float(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
     with pytest.raises(ValueError, match="Invalid result format"):
-        execute_water_level_script("dummy_script.sh")
+        execute_water_level_script("dummy_script.sh", script_type="BASH")
 
 
 def test_execute_script_failed_execution(monkeypatch):
     # Mock subprocess.check_output to simulate script execution failure
-    def mock_check_output(script_path, shell):
+    def mock_check_output(script_path, text):
         # Simulate a CalledProcessError
         raise subprocess.CalledProcessError(returncode=1, cmd=script_path, output="Script failed")
 
     monkeypatch.setattr(subprocess, "check_output", mock_check_output)
 
     with pytest.raises(RuntimeError, match="Script execution failed: Script failed"):
-        execute_water_level_script("dummy_script.sh")
+        execute_water_level_script("dummy_script.sh", script_type="PYTHON")
 
 
 def test_execute_script_real_file(script="./dummy_script.sh"):
     print(os.path.abspath(script))
-    result = execute_water_level_script(script)
+    result = execute_water_level_script(script, script_type="BASH")
     print(result)
 
 
