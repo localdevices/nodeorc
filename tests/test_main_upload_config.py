@@ -15,10 +15,6 @@ def config_file(tmpdir):
             "token_refresh": "somekey",
             "token_access": "somekey"
         },
-        "storage": {
-            "url": "./tmp",
-            "bucket_name": "examplevideo"
-        },
         "settings": {
             "parse_dates_from_file": true,
             "video_file_fmt": "{%Y%m%d_%H%M%S}.mp4",
@@ -45,7 +41,6 @@ def test_load_config(config_file):
     from nodeorc.main import load_config
     config = load_config(config_file)
     assert config["callback_url"]["url"] == "http://framework:8000"
-    assert config["storage"]["url"] == "./tmp"
     assert config["settings"]["parse_dates_from_file"] == True
     assert config["disk_management"]["min_free_space"] == 2
 

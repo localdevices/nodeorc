@@ -107,24 +107,29 @@ def execute_water_level_script(
         script_type = "PYTHON"
     try:
         if script_type.upper() == "PYTHON":
-            output = subprocess.check_output(
+            output = subprocess.run(
                 [sys.executable, "-c", script],
-                text=True
+                text=True,
+                capture_output=True,
             )
-            last_line = output.strip().splitlines()[-1]
         else:
-            output = subprocess.check_output(
+            output = subprocess.run(
                 script,
                 shell=True,
+                capture_output=True
             )
-            last_line = output.decode(encoding="utf-8").strip().splitlines()[-1]
+        if output.returncode != 0:
+            raise RuntimeError(f"Script execution failed: gives output {output.stderr} with output code {output.returncode}")
+        if script_type.upper() == "PYTHON":
+            last_line = output.stdout.strip().splitlines()[-1]
+        else:
+            last_line = output.stdout.decode(encoding="utf-8").strip().splitlines()[-1]
         datetime_str, float_str = last_line.split(",")
         # Validate datetime format
         datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
         float_value = float(float_str)
         return datetime_obj, float_value
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Script execution failed: {e.output.strip()}") from e
+
     except (ValueError, IndexError) as e:
         raise ValueError(f"Invalid result format: {last_line}, must be of form %Y-%m-%dT%H:%M:%SZ,<value>") from e
 

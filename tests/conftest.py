@@ -45,30 +45,16 @@ def session_config(session_empty, tmpdir):
         shutdown_after_task=False,
         reboot_after=0,
     )
-    storage_instance = db.Storage()
     disk_management_instance = db.DiskManagement(home_folder=str(tmpdir))
     water_level_settings_instance = db.WaterLevelSettings()
     callback_url_instance = db.CallbackUrl(server_name="testserver")
     session.add(device_instance)
     session.add(settings_instance)
-    session.add(storage_instance)
     session.add(disk_management_instance)
     session.add(water_level_settings_instance)
     session.add(callback_url_instance)
     # commit to give all an id
     session.commit()
-
-    active_config_instance = db.ActiveConfig(
-        settings_id=settings_instance.id,
-        storage_id=storage_instance.id,
-        disk_management_id=disk_management_instance.id,
-        callback_url_id=callback_url_instance.id,
-
-    )
-    session.add(active_config_instance)
-    # Commit the session to save changes
-    session.commit()
-
     return session  # Provide the session to tests
 
 

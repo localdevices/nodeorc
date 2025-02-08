@@ -25,32 +25,29 @@ class LocalTaskProcessor:
     def __init__(
             self,
             task_form_template,
-            # callback_url: models.CallbackUrl,
-            # storage: models.Storage,
-            # settings: models.Settings,
-            water_level_config: dict,
-            # disk_management: db_models.DiskManagement,
-            config: db.ActiveConfig,
+            callback_url: db.CallbackUrl,
+            settings: db.Settings,
+            water_level_settings: dict,
+            disk_management: db.DiskManagement,
             max_workers: int = 1,
             auto_start_threads: bool = True,
             logger=logging,
 
     ):
         self.task_form_template = task_form_template
-        self.settings = config.settings
-        self.video_file_ext = config.settings.video_file_fmt.split(".")[-1]
-        self.disk_management = config.disk_management
-        self.callback_url = config.callback_url.pydantic
-        self.storage = config.storage.pydantic
-        self.water_level_config = water_level_config
+        self.settings = settings
+        self.video_file_ext = settings.video_file_fmt.split(".")[-1]
+        self.disk_management = disk_management
+        self.callback_url = callback_url.pydantic
+        self.water_level_settings = water_level_settings
         self.max_workers = max_workers  # for now we always only do one job at the time
         self.logger = logger
         self.processing = False  # state for checking if any processing is going on
         self.reboot = False  # state that checks if a scheduled reboot should be done
-        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.water_level_config["file_template"])
+        self.water_level_file_template = os.path.join(self.disk_management.water_level_path, self.water_level_settings["file_template"])
         # make a list for processed files or files that are being processed so that they are not duplicated
         self.processed_files = set()
-        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{water_level_config["datetime_fmt"]}')
+        self.logger.info(f'Water levels will be searched for in {self.water_level_file_template} using a datetime format "{water_level_settings["datetime_fmt"]}')
         self.logger.info(f"Start listening to new videos in folder {self.disk_management.incoming_path}.")
         self.event = threading.Event()
 
@@ -148,15 +145,16 @@ class LocalTaskProcessor:
                         self.cleanup_space(free_space=free_space)
 
     def add_water_level(self, single_task=False):
+        session = db_ops.get_session()
         self.logger.info("Starting thread for retrieving water levels")
         # TODO: retrieve water level parameters and only if available run this!
-        if self.water_level_config:
+        if self.water_level_settings:
             while not self.event.is_set():
                 try:
                     self.logger.info("Checking for water levels.")
                     timestamp, level = water_level.execute_water_level_script(
-                        script=self.water_level_config["script"],
-                        script_type=self.water_level_config["script_type"].name,
+                        script=self.water_level_settings["script"],
+                        script_type=self.water_level_settings["script_type"].name,
                     )
                     self.logger.info(f"Water level found for timestamp {timestamp} with value {level}. Will add to database if not already existing.")
                     db_ops.add_water_level(session=session, timestamp=timestamp, level=level)
@@ -165,7 +163,7 @@ class LocalTaskProcessor:
                 except Exception as e:
                     self.logger.error(f"Error in retrieval of water levels: {e}")
                 # sleep for configured amount of seconds
-                time.sleep(self.water_level_config["frequency"])
+                time.sleep(self.water_level_settings["frequency"])
             self.logger.info("Water level thread terminated.")
         else:
             self.logger.info("No water level parameters configured, skipping retrieval.")
@@ -285,7 +283,7 @@ class LocalTaskProcessor:
             timestamp_level, h_a = get_water_level(
                 timestamp,
                 file_fmt=self.water_level_file_template,
-                datetime_fmt=self.water_level_config["datetime_fmt"],
+                datetime_fmt=self.water_level_settings["datetime_fmt"],
                 allowed_dt=self.settings.allowed_dt,
                 logger=self.logger
             )

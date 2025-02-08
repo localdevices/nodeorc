@@ -29,22 +29,6 @@ def test_start_successful_execution(runner, session_config, monkeypatch):
     # assert "is online to run video analyses" in result.output
 
 
-def test_start_no_active_config_error(runner, mocker):
-    mocker.patch("nodeorc.db_ops.get_active_config", return_value=None)
-    result = runner.invoke(start)
-    assert result.exit_code != 0
-    assert "You do not yet have an active configuration." in result.output
-    assert isinstance(result.exception, SystemExit)
-
-
-def test_start_initialization_failure(runner, mocker):
-    mocker.patch("nodeorc.db_ops.get_active_config", return_value={"dummy_config": True})
-    # mocker.patch("nodeorc.db.init_basedata.get_data_session", side_effect=Exception("Initialization error"))
-    result = runner.invoke(start)
-    assert result.exit_code != 0
-    assert "You do not yet have a water level configuration." in result.output
-    assert isinstance(result.exception, SystemExit)
-
 
 def test_start_invalid_task_form_error(runner, session_config, mocker, monkeypatch):
     monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_config)

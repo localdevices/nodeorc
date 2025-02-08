@@ -74,15 +74,3 @@ class Device(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-    # @property
-    # def as_dict(self):
-    #     device_info = {
-    #         key: value for key, value in self.__dict__.items() if not key.startswith('_') and not callable(value)
-    #     }
-    #     # replace the datetime by a time string
-    #     device_info["created_at"] = self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    #     device_info["id"] = str(self.id)
-    #     device_info["status"] = self.status.value
-    #     device_info["form_status"] = self.form_status.value
-    #     device_info["nodeorc_version"] = self.nodeorc_version
-    #     return device_info

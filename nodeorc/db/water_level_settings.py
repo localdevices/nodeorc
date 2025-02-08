@@ -37,12 +37,12 @@ class WaterLevelSettings(Base):
     )
     script_type = Column(
         Enum(ScriptType),
-        default=ScriptType.BASH,
+        default=ScriptType.PYTHON,
         comment="Type of script used to retrieve water level data from the device or API. Either 'PYTHON' or 'BASH'."
     )
     script = Column(
         String,
-        default="echo \"2000-01-01T00:00:00Z, 10\"",
+        default="print(\"2000-01-01T00:00:00Z, 10\")",
         comment="Content of the script to be executed to retrieve water level data from the device or API. Script must "
                 "print a water level value to stdout in the form \"%Y-%m-%dT%H:%M:%SZ, <value>\""
     )
@@ -110,7 +110,7 @@ def validate_script(mapper, connection, target):
     if target.script:
         try:
             # Execute the script and capture its output
-            _ = water_level.execute_water_level_script(target.script, target.script_type)
+            _ = water_level.execute_water_level_script(target.script, target.script_type.name)
         except Exception as e:
             raise ValueError(
                 f"Error while validating script: {str(e)}"
