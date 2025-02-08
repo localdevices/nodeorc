@@ -1,35 +1,37 @@
-import platform
 import socket
-import uuid
-
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, JSON
-from sqlalchemy.orm import Mapped, mapped_column, validates
+from sqlalchemy import Column, String, DateTime, JSON, Integer, ForeignKey
+from sqlalchemy.orm import mapped_column, validates, relationship
 
 from nodeorc.db import Base
 import pyorc
 
 class CameraConfig(Base):
     __tablename__ = "camera_config"
-    id: Mapped[uuid.UUID] = mapped_column(
+    id = Column(
+        Integer,
         primary_key=True,
-        default=uuid.uuid4()
-    )
-    name = Column(
-        String,
-        nullable=False,
-        default=socket.gethostname()
     )
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(),
         nullable=False
     )
-    config = Column(
+    name = Column(
+        String,
+        nullable=False,
+        default=socket.gethostname()
+    )
+    profile_id = Column(
+        Integer,
+        ForeignKey("profile.id"),
+        nullable=True,
+    )
+    camera_config = Column(
         JSON,
         nullable=False,
-        default=platform.platform()
     )
+    profile = relationship("Profile", foreign_keys=[profile_id])
 
     def __str__(self):
         return "{}".format(self.id)
@@ -37,7 +39,7 @@ class CameraConfig(Base):
     def __repr__(self):
         return "{}".format(self.__str__())
 
-    @validates('config')
+    @validates('camera_config')
     def validate_camera_config(self, key, value):
         """Validate that the provided JSON is a valid camera configuration."""
         # try to read the config with pyorc
@@ -48,3 +50,6 @@ class CameraConfig(Base):
             raise ValueError(
                 f"Error while validating camera config: {str(e)}"
             )
+
+    def callback(self):
+        pass

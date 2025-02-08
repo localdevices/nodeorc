@@ -2,15 +2,17 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .base import Base, AlchemyEncoder, sqlalchemy_to_dict
+from .base import Base, RemoteBase, AlchemyEncoder, sqlalchemy_to_dict
 from .callback import Callback
 from .callback_url import CallbackUrl
 from .device import Device, DeviceStatus, DeviceFormStatus
 from .disk_management import DiskManagement
+from .profile import Profile
+from .video import Video
 from .settings import Settings
 from .task_form import TaskForm, TaskFormStatus
 from .water_level_settings import WaterLevelSettings, ScriptType
-from .water_level_timeseries import WaterLevelTimeSeries
+from .water_level_timeseries import TimeSeries
 from .camera_config import CameraConfig
 
 from nodeorc import __home__

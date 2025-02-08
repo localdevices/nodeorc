@@ -2,12 +2,40 @@
 import json
 
 from datetime import datetime
+from sqlalchemy import Column, Integer, Boolean
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.declarative import DeclarativeMeta
 
 # database set up
 Base = declarative_base()
 
+
+class RemoteBase(Base):
+    """Base class for all models that can have remote neighbours."""
+    __abstract__ = True
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True
+    )
+    remote_id = Column(
+        Integer,
+        nullable=True,
+        unique=True,
+    )
+    remote_site = Column(
+        Integer,
+        nullable=True,
+    )
+    sync_status = Column(
+        Boolean,
+        nullable=True,
+    )
+
+    def callback(self):
+        # default callback requirements
+        # url = ...
+        pass
 
 # encoding to JSON
 class AlchemyEncoder(json.JSONEncoder):

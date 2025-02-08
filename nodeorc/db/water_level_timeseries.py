@@ -2,9 +2,9 @@
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, DateTime, Float
-from nodeorc.db import Base
+from nodeorc.db import RemoteBase
 
-class WaterLevelTimeSeries(Base):
+class TimeSeries(RemoteBase):
     """
     Represents water level data with timestamp and value.
 
@@ -24,10 +24,16 @@ class WaterLevelTimeSeries(Base):
     level : float
         The measured water level value. This attribute is mandatory.
     """
-    __tablename__ = "water_level_time_series"
+    __tablename__ = "time_series"
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=lambda: datetime.now())
-    level = Column(Float, nullable=False)
+    h = Column(Float, nullable=False)
+    q_05 = Column(Float, nullable=True)
+    q_25 = Column(Float, nullable=True)
+    q_50 = Column(Float, nullable=True)
+    q_75 = Column(Float, nullable=True)
+    q_95 = Column(Float, nullable=True)
+
 
     def __str__(self):
         return "{}: {}".format(self.timestamp, self.level)

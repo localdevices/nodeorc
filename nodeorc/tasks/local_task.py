@@ -500,7 +500,7 @@ def get_water_level(
         # first try to get water level from database
         rec = db_ops.get_water_level(session, timestamp, allowed_dt)
         timestamp = rec.timestamp
-        h_a = rec.level
+        h_a = rec.h
         logger.info(f"Water level found in database at closest timestamp {timestamp} with value {h_a} m.")
     except Exception as db_ex:
         logger.warning(f"Failed to fetch water level from database at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Trying data file.")

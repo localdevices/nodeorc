@@ -56,7 +56,7 @@ def add_config(
 
 
 from sqlalchemy.orm import Session
-from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries
+from nodeorc.db import WaterLevelSettings, TimeSeries
 
 
 def add_replace_water_level_script(
@@ -233,17 +233,17 @@ def add_water_level(
 
     Returns
     -------
-    WaterLevelTimeSeries
+    TimeSeries
         The created water level record.
     """
     try:
         # check if the time stamp already exists in the database
-        water_level = session.query(WaterLevelTimeSeries).filter_by(timestamp=timestamp).first()
+        water_level = session.query(TimeSeries).filter_by(timestamp=timestamp).first()
         if not water_level:
             # Create a new instance of WaterLevelSettings with given data
-            water_level = WaterLevelTimeSeries(
+            water_level = TimeSeries(
                 timestamp=timestamp,
-                level=level
+                h=level
             )
             session.add(water_level)  # Add record to the session
             session.commit()  # Commit the transaction
@@ -280,7 +280,7 @@ def get_water_level(
 
     Returns
     -------
-    WaterLevelTimeSeries
+    TimeSeries
         The water level record closest to the specified timestamp.
 
     Raises
@@ -291,8 +291,8 @@ def get_water_level(
     """
     # SQLite does not allow for tzinfo in a time stamp, therefore, first remove the tzinfo if it exists
     timestamp = timestamp.replace(tzinfo=None)
-    before_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp <= timestamp).order_by(WaterLevelTimeSeries.timestamp.desc()).first()
-    after_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp > timestamp).order_by(WaterLevelTimeSeries.timestamp).first()
+    before_record = session.query(TimeSeries).filter(TimeSeries.timestamp <= timestamp).order_by(TimeSeries.timestamp.desc()).first()
+    after_record = session.query(TimeSeries).filter(TimeSeries.timestamp > timestamp).order_by(TimeSeries.timestamp).first()
     
     # Determine the closest record
     closest_record = None

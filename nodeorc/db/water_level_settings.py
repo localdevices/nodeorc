@@ -110,7 +110,7 @@ def validate_script(mapper, connection, target):
     if target.script:
         try:
             # Execute the script and capture its output
-            _ = water_level.execute_water_level_script(target.script, target.script_type.name)
+            _ = water_level.execute_water_level_script(target.script, target.script_type)
         except Exception as e:
             raise ValueError(
                 f"Error while validating script: {str(e)}"

@@ -67,9 +67,9 @@ def session_water_levels(session_config):
     values = list(range(len(timestamps)))
     # make several timestamps to store
     for t, v in zip(timestamps, values):
-        water_level_instance = db.WaterLevelTimeSeries(
+        water_level_instance = db.TimeSeries(
             timestamp=t,
-            level=v,
+            h=v,
         )
         session_config.add(water_level_instance)
     session_config.commit()
