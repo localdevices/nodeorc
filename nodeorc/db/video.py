@@ -1,9 +1,17 @@
 """Model for water level time series."""
-
+import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, ForeignKey
-from sqlalchemy_file import FileField, ImageField
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, String
+from sqlalchemy.orm import relationship
 from nodeorc.db import RemoteBase
+
+class VideoStatus(enum.Enum):
+    NEW = 1, "New video"
+    QUEUE = 2, "Waiting for processing"
+    TASK = 3, "Being processed"
+    DONE = 4, "Finished"
+    ERROR = 5, "Error occurred"
+
 
 class Video(RemoteBase):
     """
@@ -22,24 +30,30 @@ class Video(RemoteBase):
         Primary key of the video record.
     timestamp : datetime
         The timestamp indicating when the video record was created.
-    file : FileField or None
+    file : str or None
         The file associated with the video. Can be null.
-    image : ImageField or None
+    image : str or None
         The image associated with the video. Can be null.
-    thumbnail : ImageField or None
+    thumbnail : str or None
         The thumbnail of the video. Can be null.
     camera_config : int
         Foreign key linking to the associated camera configuration.
     """
     __tablename__ = "video"
+
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=lambda: datetime.now())
-    file = Column(FileField, nullable=True)
-    image = Column(ImageField, nullable=True)
-    thumbnail = Column(ImageField, nullable=True)
-    camera_config = Column(ForeignKey("camera_config.id"))
+    file = Column(String, nullable=True)
+    image = Column(String, nullable=True)
+    thumbnail = Column(String, nullable=True)
+    camera_config_id = Column(Integer, ForeignKey("camera_config.id"))  # relate by id
+    # time_series = Column(ForeignKey("time_series.id"))
+
+    camera_config = relationship("CameraConfig")
+    time_series = relationship("TimeSeries", uselist=False, back_populates="video")
+
     def __str__(self):
-        return "{}: {}".format(self.timestamp, self.level)
+        return "{}: {}".format(self.timestamp, self.file)
 
     def __repr__(self):
         return "{}".format(self.__str__())

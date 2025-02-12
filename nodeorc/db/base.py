@@ -2,7 +2,7 @@
 import json
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, Boolean
+from sqlalchemy import Column, Integer, Boolean, DateTime
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.declarative import DeclarativeMeta
 
@@ -18,6 +18,7 @@ class RemoteBase(Base):
         primary_key=True,
         autoincrement=True
     )
+    created_at = Column(DateTime, default=lambda: datetime.now())
     remote_id = Column(
         Integer,
         nullable=True,

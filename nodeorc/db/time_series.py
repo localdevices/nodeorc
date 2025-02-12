@@ -1,7 +1,8 @@
 """Model for water level time series."""
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, Float
+from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey
+from sqlalchemy.orm import relationship
 from nodeorc.db import RemoteBase
 
 class TimeSeries(RemoteBase):
@@ -33,7 +34,8 @@ class TimeSeries(RemoteBase):
     q_50 = Column(Float, nullable=True)
     q_75 = Column(Float, nullable=True)
     q_95 = Column(Float, nullable=True)
-
+    video_id = Column(Integer, ForeignKey("video.id"))
+    video = relationship("Video", uselist=False, back_populates="time_series")
 
     def __str__(self):
         return "{}: {}".format(self.timestamp, self.level)

@@ -12,7 +12,7 @@ from .video import Video
 from .settings import Settings
 from .task_form import TaskForm, TaskFormStatus
 from .water_level_settings import WaterLevelSettings, ScriptType
-from .water_level_timeseries import TimeSeries
+from .time_series import TimeSeries
 from .camera_config import CameraConfig
 
 from nodeorc import __home__
