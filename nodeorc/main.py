@@ -11,9 +11,9 @@ from nodeorc import db, log, models, db_ops, tasks, settings_path, utils, __vers
 
 session = db_ops.get_session()  # db.session
 # see if there is an active config, if not logger goes to $HOME/.nodeorc
-active_config = db_ops.get_active_config()
-if active_config:
-    log_path = active_config.disk_management.log_path
+disk_management = db_ops.get_disk_management(session=session)
+if disk_management:
+    log_path = disk_management.log_path
 else:
     log_path = None
 logger = log.start_logger(
@@ -30,16 +30,16 @@ load_dotenv()
 
 device = session.query(db.Device).first()
 
-def get_docs_settings():
-    fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
-    # list all attributes except internal and fixed fields
-    fields = [f for f in dir(db.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
-    docs = """JSON-file should contain the following settings: \n"""
-    docs += """================================================\n\n"""
-    for f in fields:
-        attr_doc = getattr(db.ActiveConfig, f).comment
-        docs += " {} : {}\n\n".format(f[:-3], attr_doc)
-    return docs
+# def get_docs_settings():
+#     fixed_fields = ["id", "created_at", "metadata", "registry", "callback_url", "storage", "settings", "disk_management"]
+#     # list all attributes except internal and fixed fields
+#     fields = [f for f in dir(db.ActiveConfig) if not(f in fixed_fields) if not f.startswith("_")]
+#     docs = """JSON-file should contain the following settings: \n"""
+#     docs += """================================================\n\n"""
+#     for f in fields:
+#         attr_doc = getattr(db.ActiveConfig, f).comment
+#         docs += " {} : {}\n\n".format(f[:-3], attr_doc)
+#     return docs
 
 
 def load_config(config_fn):
@@ -189,25 +189,30 @@ def start():
     #                           '"--storage remote").')
     # if listen == "local":
     # get the stored configuration
-    active_config = db_ops.get_active_config(session=session)
-    if not active_config:
+    settings = db_ops.get_settings(session=session)
+    disk_management = db_ops.get_disk_management(session=session)
+    water_level_settings = db_ops.get_water_level_settings(session=session)
+    callback_url = db_ops.get_callback_url(session=session)
+
+    if not settings:
         raise click.UsageError(
-            'You do not yet have an active configuration. Upload an activate configuration '
+            'You do not yet have general settings configured. Upload settings '
             'through the CLI. Type "nodeorc upload-config --help" for more information'
         )
-    water_level_config = db_ops.get_water_level_config(session=session)
-    if not(water_level_config):
+    if not disk_management:
         raise click.UsageError(
-            'You do not yet have a water level configuration. Upload a water level retrieval '
+            'You do not yet have disk management configured. Upload disk management settings '
+            'through the CLI. Type "nodeorc upload-config --help" for more information'
+        )
+    if not(water_level_settings):
+        raise click.UsageError(
+            'You do not yet have water level settings. Upload a water level retrieval '
             'script through the CLI. Type "nodeorc upload-water-level-script --help" for more information'
         )
     else:
-        water_level_config = utils.model_to_dict(water_level_config)
-    # initialize the database for storing data
-    # session_data = db.init_basedata.get_data_session()
+        water_level_settings = utils.model_to_dict(water_level_settings)
     # read the task form from the configuration
     task_form_template = db_ops.get_active_task_form(session, parse=True)
-    callback_url = active_config.callback_url
     if task_form_template is None:
         # go into the task form get daemon and try to acquire a task form from server every 5 minutes
         logger.info("Awaiting task by requesting a new task every 5 seconds")
@@ -216,7 +221,7 @@ def start():
             callback_url=callback_url,
             device=device,
             logger=logger,
-            reboot_after=active_config.settings.reboot_after
+            reboot_after=settings.reboot_after
         )
         # this return never happens, unless isolated unit tests are run
         return 0
@@ -233,7 +238,7 @@ def start():
             task_form_template = new_task_form_row.task_body
     # verify that task_template can be converted to a valid Task
     try:
-        task_test = models.Task(**task_form_template)
+        _ = models.Task(**task_form_template)
     except Exception as e:
         logger.error(
             f"Task body set as active configuration cannot be formed into a valid Task instance. Reason: {str(e)}"
@@ -247,8 +252,10 @@ def start():
         processor = tasks.LocalTaskProcessor(
             task_form_template=task_form_template,
             logger=logger,
-            water_level_config=water_level_config,
-            config=active_config
+            settings=settings,
+            disk_management=disk_management,
+            callback_url=callback_url,
+            water_level_settings=water_level_settings,
         )
         processor.await_task()
     except Exception as e:
@@ -258,26 +265,19 @@ def start():
 
 @cli.command(
     short_help="Upload a new configuration for this device from a JSON formatted file",
-    epilog=get_docs_settings()
+    # epilog=get_docs_settings()
 )
 @click.argument(
     "JSON-file",
     type=click.Path(resolve_path=True, dir_okay=False, file_okay=True),
     required=True,
 )
-@click.option(
-    "-a",
-    "--set-as-active",
-    is_flag=True,
-    default=True,
-    help="Flag to define if uploaded configuration should be set as active (default: True)"
-)
-def upload_config(json_file, set_as_active):
+def upload_config(json_file):
     """Upload a new configuration for this device from a JSON formatted file"""
     session = db_ops.get_session()
     logger.info(f"Device {str(device)} receiving new configuration from {json_file}")
     config_data = load_config(json_file)
-    rec = db_ops.add_config(session, config_data=config_data, set_as_active=set_as_active)
+    rec = db_ops.add_config(session, config_data=config_data)
     logger.info(f"Settings updated successfully to {rec}")
 
 @cli.command(
@@ -367,7 +367,7 @@ def upload_water_level_script(script, script_type, file_template, frequency, dat
 #         traceback.print_tb(e.__traceback__)
 
 
-upload_config.__doc__ = get_docs_settings()
+# upload_config.__doc__ = get_docs_settings()
 
 if __name__ == "__main__":
     cli()

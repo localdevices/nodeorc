@@ -8,7 +8,6 @@ from nodeorc import db
 def add_config(
         session: sqlalchemy.orm.session.Session,
         config_data: dict,
-        set_as_active=True
 ):
     """
     Add a configuration as new record to Config table
@@ -17,7 +16,6 @@ def add_config(
     ----------
     session : sqlalchemy.orm.session.Session
     config_data : dict
-    set_as_active : bool
 
     Returns
     -------
@@ -25,7 +23,6 @@ def add_config(
     """
     settings_record = db.Settings(**config_data["settings"]) if "settings" in config_data else None
     disk_management_record = db.DiskManagement(**config_data["disk_management"]) if "disk_management" in config_data else None
-    storage_record = db.Storage(**config_data["storage"]) if "storage" in config_data else None
     callback_url_record = db.CallbackUrl(**config_data["callback_url"]) if "callback_url" in config_data else None
     # if "storage" in config_data:
     #     storage = config_data["storage"]
@@ -43,64 +40,23 @@ def add_config(
     #     callback_url_record = None
     session.add(settings_record) if settings_record else None
     session.add(disk_management_record) if disk_management_record else None
-    session.add(storage_record) if storage_record else None
     session.add(callback_url_record) if callback_url_record else None
     session.commit()
-    if set_as_active:
-        active_config_record = add_replace_active_config(
-            session,
-            settings_record=settings_record,
-            disk_management_record=disk_management_record,
-            storage_record=storage_record,
-            callback_url_record=callback_url_record
-        )
-        return active_config_record
+    return None
+    # if set_as_active:
+    #     active_config_record = add_replace_active_config(
+    #         session,
+    #         settings_record=settings_record,
+    #         disk_management_record=disk_management_record,
+    #         storage_record=storage_record,
+    #         callback_url_record=callback_url_record
+    #     )
+    #     return active_config_record
 
 
-def add_replace_active_config(
-        session,
-        settings_record=None,
-        disk_management_record=None,
-        storage_record=None,
-        callback_url_record=None
-):
-    """Set config as the currently active config."""
-    active_configs = session.query(db.ActiveConfig)
-    if len(active_configs.all()) == 0:
-        # check if all records are present
-        assert(
-                None not in [
-            settings_record,
-            disk_management_record,
-            storage_record,
-            callback_url_record
-        ]
-        ), "No active configuration available yet, you need to supply settings, disk_management, storage and callback_url in your configuration. One or more are missing."
-        # no active config yet, make a new one
-        active_config_record = db.ActiveConfig(
-            settings_id=settings_record.id,
-            disk_management_id=disk_management_record.id,
-            storage_id=storage_record.id,
-            callback_url_id=callback_url_record.id,
-        )
-        session.add(active_config_record)
-    else:
-        # active config already exists, replace config
-        active_config_record = get_active_config()
-        if settings_record:
-            active_config_record.settings = settings_record
-            # active_config_record.settings_id = settings_record.id
-        if disk_management_record:
-            active_config_record.disk_management = disk_management_record
-        if storage_record:
-            active_config_record.storage = storage_record
-        if callback_url_record:
-            active_config_record.callback_url = callback_url_record
-    session.commit()
-    return active_config_record
 
 from sqlalchemy.orm import Session
-from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries
+from nodeorc.db import WaterLevelSettings, TimeSeries
 
 
 def add_replace_water_level_script(
@@ -164,31 +120,39 @@ def add_replace_water_level_script(
         session.rollback()
         raise ValueError(f"Error occurred: {e}")
 
+
 def get_session():
     return db.session
 
-def get_settings(session, id):
-    """
-    Get a Config pydantic object from a stored db model
-
-    Parameters
-    ----------
-    config_record : db.Config
-        configuration
-
-    Returns
-    -------
-
-    """
-    return session.query(db.Settings).get(id)
-
-
-def get_active_config(session=db.session):
-    active_configs = session.query(db.ActiveConfig)
-    if len(active_configs.all()) == 0:
+def get_settings(session):
+    """Get current settings."""
+    q = session.query(db.Settings)
+    if len(q.all()) == 0:
         return None
-    active_config = active_configs.first()
-    return active_config
+    return q.first()
+
+
+def get_disk_management(session):
+    """Get current disk management."""
+    q = session.query(db.DiskManagement)
+    if len(q.all()) == 0:
+        return None
+    return q.first()
+
+def get_callback_url(session):
+    """Get current callback url."""
+    q = session.query(db.CallbackUrl)
+    if len(q.all()) == 0:
+        return None
+    return q.first()
+
+
+def get_water_level_settings(session):
+    """Get current water level settings."""
+    q = session.query(WaterLevelSettings)
+    if len(q.all()) == 0:
+        return None
+    return q.first()
 
 
 def get_active_task_form(session, parse=False, allow_candidate=True):
@@ -269,17 +233,17 @@ def add_water_level(
 
     Returns
     -------
-    WaterLevelTimeSeries
+    TimeSeries
         The created water level record.
     """
     try:
         # check if the time stamp already exists in the database
-        water_level = session.query(WaterLevelTimeSeries).filter_by(timestamp=timestamp).first()
+        water_level = session.query(TimeSeries).filter_by(timestamp=timestamp).first()
         if not water_level:
             # Create a new instance of WaterLevelSettings with given data
-            water_level = WaterLevelTimeSeries(
+            water_level = TimeSeries(
                 timestamp=timestamp,
-                level=level
+                h=level
             )
             session.add(water_level)  # Add record to the session
             session.commit()  # Commit the transaction
@@ -316,7 +280,7 @@ def get_water_level(
 
     Returns
     -------
-    WaterLevelTimeSeries
+    TimeSeries
         The water level record closest to the specified timestamp.
 
     Raises
@@ -327,8 +291,8 @@ def get_water_level(
     """
     # SQLite does not allow for tzinfo in a time stamp, therefore, first remove the tzinfo if it exists
     timestamp = timestamp.replace(tzinfo=None)
-    before_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp <= timestamp).order_by(WaterLevelTimeSeries.timestamp.desc()).first()
-    after_record = session.query(WaterLevelTimeSeries).filter(WaterLevelTimeSeries.timestamp > timestamp).order_by(WaterLevelTimeSeries.timestamp).first()
+    before_record = session.query(TimeSeries).filter(TimeSeries.timestamp <= timestamp).order_by(TimeSeries.timestamp.desc()).first()
+    after_record = session.query(TimeSeries).filter(TimeSeries.timestamp > timestamp).order_by(TimeSeries.timestamp).first()
     
     # Determine the closest record
     closest_record = None

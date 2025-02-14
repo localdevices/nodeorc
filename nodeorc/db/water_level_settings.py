@@ -37,12 +37,12 @@ class WaterLevelSettings(Base):
     )
     script_type = Column(
         Enum(ScriptType),
-        default=ScriptType.BASH,
+        default=ScriptType.PYTHON,
         comment="Type of script used to retrieve water level data from the device or API. Either 'PYTHON' or 'BASH'."
     )
     script = Column(
         String,
-        default="echo \"2000-01-01T00:00:00Z, 10\"",
+        default="print(\"2000-01-01T00:00:00Z, 10\")",
         comment="Content of the script to be executed to retrieve water level data from the device or API. Script must "
                 "print a water level value to stdout in the form \"%Y-%m-%dT%H:%M:%SZ, <value>\""
     )

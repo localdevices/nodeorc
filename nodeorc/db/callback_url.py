@@ -12,10 +12,6 @@ class CallbackUrl(Base):
 
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=lambda: datetime.now())
-    server_name = Column(
-        String,
-        comment="User defined recognizable name for server"
-    )
     url = Column(
         String,
         default="https://127.0.0.1:8000/api",
@@ -24,7 +20,8 @@ class CallbackUrl(Base):
     )
     token_refresh_end_point = Column(
         String,
-        comment="Refresh end point for JWT tokens of the server"
+        comment="Refresh end point for JWT tokens of the server",
+        default="/api/token/refresh"
     )
     token_refresh = Column(
         String,

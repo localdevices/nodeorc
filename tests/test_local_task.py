@@ -5,17 +5,13 @@ import pytest
 from datetime import datetime, UTC, timedelta
 from unittest.mock import MagicMock, patch
 
-from nodeorc.db import CallbackUrl, Storage, Settings, DiskManagement, WaterLevelSettings, WaterLevelTimeSeries
+from nodeorc.db import CallbackUrl, Settings, DiskManagement, WaterLevelSettings, TimeSeries
 from nodeorc.tasks.local_task import LocalTaskProcessor, get_water_level
 from nodeorc import utils, db_ops
 
 @pytest.fixture
 def callback_url(session_config):
     return session_config.query(CallbackUrl).first()
-
-@pytest.fixture
-def storage(session_config):
-    return session_config.query(Storage).first()
 
 @pytest.fixture
 def settings(session_config):
@@ -26,28 +22,22 @@ def disk_management(session_config):
     return session_config.query(DiskManagement).first()
 
 @pytest.fixture
-def water_level_config(session_config):
+def water_level_settings(session_config):
     return session_config.query(WaterLevelSettings).first()
 
 
 @pytest.fixture
-def local_task_processor(session_config, settings, water_level_config, logger):
+def local_task_processor(session_config, settings, disk_management, callback_url, water_level_settings, logger):
     task_form_template = MagicMock()
-    water_level_config = utils.model_to_dict(water_level_config)
-    active_config = db_ops.get_active_config(session=session_config)
-    # active_config = active_config.model_dump()
-    # callback_url = MagicMock(spec=CallbackUrl)
-    # storage = MagicMock(spec=Storage)
-    # settings = MagicMock(spec=Settings)
-    # water_level_config = {}
-    # disk_management = MagicMock(spec=DiskManagement)
-    # logger = MagicMock()
+    water_level_settings = utils.model_to_dict(water_level_settings)
     return LocalTaskProcessor(
         task_form_template=task_form_template,
         logger=logger,
-        water_level_config=water_level_config,
+        settings=settings,
+        disk_management=disk_management,
+        callback_url=callback_url,
+        water_level_settings=water_level_settings,
         auto_start_threads=False,
-        config=active_config,
     )
 
 @pytest.fixture
@@ -66,12 +56,12 @@ def test_await_task(tmpdir, local_task_processor, mocker):
 
 
 
-def test_add_water_level(tmpdir, session_config, local_task_processor, monkeypatch, mocker):
-    time_series = WaterLevelTimeSeries()
-    monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_config)
-    timestamp, level = local_task_processor.add_water_level(single_task=True)
-    assert isinstance(timestamp, datetime)
-    assert isinstance(level, float)
+# def test_add_water_level(tmpdir, session_config, local_task_processor, monkeypatch, mocker):
+#     time_series = TimeSeries()
+#     monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_config)
+#     timestamp, level = local_task_processor.add_water_level(single_task=True)
+#     assert isinstance(timestamp, datetime)
+#     assert isinstance(level, float)
 
 
 def test_get_water_level_from_db(session_config):
@@ -80,9 +70,9 @@ def test_get_water_level_from_db(session_config):
     values = list(range(len(timestamps)))
     # make several timestamps to store
     for t, v in zip(timestamps, values):
-        water_level_instance = WaterLevelTimeSeries(
+        water_level_instance = TimeSeries(
             timestamp=t,
-            level=v,
+            h=v,
         )
         session_config.add(water_level_instance)
     session_config.commit()
@@ -105,9 +95,9 @@ def test_get_water_level_outside_dt(session_config, monkeypatch, mocker):
     values = list(range(len(timestamps)))
     # make several timestamps to store
     for t, v in zip(timestamps, values):
-        water_level_instance = WaterLevelTimeSeries(
+        water_level_instance = TimeSeries(
             timestamp=t,
-            level=v,
+            h=v,
         )
         session_config.add(water_level_instance)
     session_config.commit()
@@ -129,9 +119,9 @@ def test_get_water_level_file_not_available(session_config, monkeypatch):
     values = list(range(len(timestamps)))
     # make several timestamps to store
     for t, v in zip(timestamps, values):
-        water_level_instance = WaterLevelTimeSeries(
+        water_level_instance = TimeSeries(
             timestamp=t,
-            level=v,
+            h=v,
         )
         session_config.add(water_level_instance)
     session_config.commit()

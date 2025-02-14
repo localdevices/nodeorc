@@ -8,7 +8,6 @@ def test_get_water_level_returns_closest_record(session_water_levels):
 
     # Get the previous hour time stamp
     prev_time = datetime.now() - timedelta(hours=1)
-
     result = get_water_level(session_water_levels, prev_time)
     # Assert that the record is close to prev_time
     assert result.timestamp - prev_time < timedelta(seconds=10)

@@ -4,7 +4,7 @@ import json
 import pytest
 import nodeorc.models as orcmodels
 
-from nodeorc.db import WaterLevelSettings, WaterLevelTimeSeries, Base, Callback
+from nodeorc.db import WaterLevelSettings, TimeSeries, Base, Callback
 from nodeorc.db_ops import add_replace_water_level_script, add_water_level
 
 from sqlalchemy import create_engine
@@ -203,33 +203,33 @@ def test_water_level_script_invalid(session, mocker):
 def test_water_level_ts_creation(session):
     timestamp = datetime.datetime(2023, 1, 1, 12, 0, 0)
     level = 5.0
-    water_level = WaterLevelTimeSeries(timestamp=timestamp, level=level)
+    water_level = TimeSeries(timestamp=timestamp, h=level)
 
     session.add(water_level)
     session.commit()
 
-    retrieved = session.query(WaterLevelTimeSeries).first()
+    retrieved = session.query(TimeSeries).first()
     assert retrieved is not None
     assert retrieved.timestamp == timestamp
-    assert retrieved.level == level
+    assert retrieved.h == level
 
 
 def test_water_level_ts_default_timestamp(session):
     level = 4.2
-    water_level = WaterLevelTimeSeries(level=level)
+    water_level = TimeSeries(h=level)
 
     session.add(water_level)
     session.commit()
 
-    retrieved = session.query(WaterLevelTimeSeries).first()
+    retrieved = session.query(TimeSeries).first()
     assert retrieved is not None
     assert isinstance(retrieved.timestamp, datetime.datetime)
-    assert retrieved.level == level
+    assert retrieved.h == level
 
 
 def test_water_level_ts_no_level(session):
     with pytest.raises(IntegrityError):
-        wl = WaterLevelTimeSeries()
+        wl = TimeSeries()
         session.add(wl)
         session.commit()
 
@@ -237,13 +237,13 @@ def test_water_level_ts_no_level(session):
 def test_add_water_level_already_exists(session):
     timestamp = datetime.datetime(2023, 1, 1, 12, 0, 0)
     level = 5.0
-    water_level = WaterLevelTimeSeries(timestamp=timestamp, level=level)
+    water_level = TimeSeries(timestamp=timestamp, h=level)
     session.add(water_level)
     session.commit()
     # now test function
     water_level_existing = add_water_level(session, timestamp, level)
     # check total amount of time stamps
-    water_levels = session.query(WaterLevelTimeSeries).all()
+    water_levels = session.query(TimeSeries).all()
     assert len(water_levels) == 1
     assert water_level_existing.id == water_level.id
 
@@ -257,7 +257,7 @@ def test_add_water_level_new(session):
     new_level = 6.0
     new_water_level = add_water_level(session, new_timestamp, new_level)
     # check total amount of time stamps
-    water_levels = session.query(WaterLevelTimeSeries).all()
+    water_levels = session.query(TimeSeries).all()
     assert len(water_levels) == 2
     # check difference
     assert new_water_level.id != water_level.id
