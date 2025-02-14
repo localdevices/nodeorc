@@ -1,10 +1,12 @@
-## [0.2.0] - 2024-09-26
+
+## [0.2.2] - 2025-02-14
 ### Added
+- New database models to prepare for migration to fastapi
 ### Changed
+- bumped pyorc version to 0.7.2
 ### Deprecated
 ### Removed
 ### Fixed
-- move to `pyopenrivercam=0.6.1` to prevent issues with new `rasterio=1.4.0`
 ### Security
 
 
