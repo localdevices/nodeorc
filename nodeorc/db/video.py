@@ -1,16 +1,17 @@
 """Model for water level time series."""
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, ForeignKey, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, String, Enum
+from sqlalchemy.orm import relationship, mapped_column, Mapped
 from nodeorc.db import RemoteBase
+from typing import Optional
 
 class VideoStatus(enum.Enum):
-    NEW = 1, "New video"
-    QUEUE = 2, "Waiting for processing"
-    TASK = 3, "Being processed"
-    DONE = 4, "Finished"
-    ERROR = 5, "Error occurred"
+    NEW = 1
+    QUEUE = 2
+    TASK = 3
+    DONE = 4
+    ERROR = 5
 
 
 class Video(RemoteBase):
@@ -41,14 +42,14 @@ class Video(RemoteBase):
     """
     __tablename__ = "video"
 
-    id = Column(Integer, primary_key=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now())
-    file = Column(String, nullable=True)
-    image = Column(String, nullable=True)
-    thumbnail = Column(String, nullable=True)
-    camera_config_id = Column(Integer, ForeignKey("camera_config.id"))  # relate by id
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    status: Mapped[enum.Enum] = mapped_column(Enum(VideoStatus), default=VideoStatus.NEW)
+    file: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    image: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    thumbnail: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    camera_config_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("camera_config.id"), nullable=True)  # relate by id
     # time_series = Column(ForeignKey("time_series.id"))
-
     camera_config = relationship("CameraConfig")
     time_series = relationship("TimeSeries", uselist=False, back_populates="video")
 

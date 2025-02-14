@@ -34,6 +34,10 @@ class TimeSeries(RemoteBase):
     q_50 = Column(Float, nullable=True)
     q_75 = Column(Float, nullable=True)
     q_95 = Column(Float, nullable=True)
+    wetted_surface = Column(Float, nullable=True)
+    wetted_perimeter = Column(Float, nullable=True)
+    fraction_velocimetry = Column(Float, nullable=True)
+
     video_id = Column(Integer, ForeignKey("video.id"))
     video = relationship("Video", uselist=False, back_populates="time_series")
 

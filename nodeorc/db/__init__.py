@@ -8,7 +8,7 @@ from .callback_url import CallbackUrl
 from .device import Device, DeviceStatus, DeviceFormStatus
 from .disk_management import DiskManagement
 from .profile import Profile
-from .video import Video
+from .video import Video, VideoStatus
 from .settings import Settings
 from .task_form import TaskForm, TaskFormStatus
 from .water_level_settings import WaterLevelSettings, ScriptType

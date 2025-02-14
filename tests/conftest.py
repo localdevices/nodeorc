@@ -47,7 +47,7 @@ def session_config(session_empty, tmpdir):
     )
     disk_management_instance = db.DiskManagement(home_folder=str(tmpdir))
     water_level_settings_instance = db.WaterLevelSettings()
-    callback_url_instance = db.CallbackUrl(server_name="testserver")
+    callback_url_instance = db.CallbackUrl()
     session.add(device_instance)
     session.add(settings_instance)
     session.add(disk_management_instance)
