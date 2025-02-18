@@ -118,7 +118,6 @@ def request_remote_task_form(session, callback_url, device, logger=logging):
                 callback_url.refresh_tokens()
                 # update headers
                 headers = {"Authorization": f"Bearer {callback_url.token_access}"}
-
         r = requests.get(
             url,
             data=device.as_dict,

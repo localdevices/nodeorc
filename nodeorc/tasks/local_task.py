@@ -14,7 +14,8 @@ from urllib.parse import urljoin
 import numpy as np
 
 from nodeorc.tasks import request_task_form
-from nodeorc import models, disk_mng, db, db_ops, utils, water_level
+from nodeorc import models, disk_mng, db, db_ops, utils, water_level, __home__
+from tests.test_cross_section import camera_config
 
 session = db_ops.get_session()
 device = session.query(db.Device).first()
@@ -269,10 +270,26 @@ class LocalTaskProcessor:
                 # set message on device
             # create Storage instance
             self.logger.info(f"Timestamp for video found at {timestamp.strftime('%Y%m%dT%H%M%S')}")
-            storage = models.Storage(
-                url=str(self.disk_management.results_path),
-                bucket_name=timestamp.strftime("%Y%m%d")
+
+            # create a preliminary video record in database
+            video = db.Video(
+                timestamp=timestamp,
+                status=db.VideoStatus.TASK,
             )
+            session.add(video)
+            session.commit()
+            session.refresh(video)
+
+            # change storage to match nodeorc api requirements
+            storage = models.Storage(
+                url=os.path.join(__home__, "uploads", "videos", timestamp.strftime("%Y%m%d")),
+                bucket_name=str(video.id)
+            )
+            #
+            # storage = models.Storage(
+            #     url=str(self.disk_management.results_path),
+            #     bucket_name=timestamp.strftime("%Y%m%d")
+            # )
             # move the file to the intended bucket
             if not(os.path.isdir(storage.bucket)):
                 os.makedirs(storage.bucket)
@@ -280,13 +297,16 @@ class LocalTaskProcessor:
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
-            timestamp_level, h_a = get_water_level(
+            # timestamp_level, h_a = get_water_level(
+            rec = get_water_level(
                 timestamp,
                 file_fmt=self.water_level_file_template,
                 datetime_fmt=self.water_level_settings["datetime_fmt"],
                 allowed_dt=self.settings.allowed_dt,
                 logger=self.logger
             )
+            # retrieve water level from time series record
+            h_a = rec.h
             # create the task object from all data
             task = create_task(
                 self.task_form_template,
@@ -302,7 +322,7 @@ class LocalTaskProcessor:
             cur_path = os.path.join(task_path, filename)
             # process the task
             task.execute(task_path)
-            # if the video was treated successfully, then we may move it to a location of interest if wanted
+
             if self.disk_management.results_path:
                 dst_path = os.path.join(
                     self.disk_management.results_path,
@@ -312,13 +332,27 @@ class LocalTaskProcessor:
             db_ops.patch_active_config_to_accepted()
             # perform the callbacks here only when video was successfully completed
             # set files and cleanup
-            self._set_results_to_final_path(cur_path, dst_path, filename, task_path)
+            self._set_results_to_final_path(cur_path, storage.bucket, filename, task_path)
+            # if the video was treated successfully, then store a record in the database
+            rel_path_name = os.path.relpath(storage.bucket, os.path.join(__home__, "uploads"))
+            video.time_series_id = rec.id,
+            video.file = f"{rel_path_name}/{filename}"
+            video.image = f"{rel_path_name}/{task.output_files['jpg'].remote_name}"
+            video.status = db.VideoStatus.DONE
+            session.commit()
+            # very finally, perform the callback
             callback_success = self._post_callbacks(task.callbacks)
+            if callback_success:
+                video.sync_status = True
+            else:
+                video.sync_status = False
+            session.commit()
 
         except Exception as e:
             callback_success = False  # video was unsuccessful so callbacks are also not successful
             message = f"Error processing {file_path}: {str(e)}"
             device.message = message
+            video.status = db.VideoStatus.ERROR
             session.commit()
             self.logger.error(message)
             # find back the file and place in the failed location, organised per day
@@ -499,8 +533,6 @@ def get_water_level(
     try:
         # first try to get water level from database
         rec = db_ops.get_water_level(session, timestamp, allowed_dt)
-        timestamp = rec.timestamp
-        h_a = rec.h
         logger.info(f"Water level found in database at closest timestamp {timestamp} with value {h_a} m.")
     except Exception as db_ex:
         logger.warning(f"Failed to fetch water level from database at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Trying data file.")
@@ -514,12 +546,13 @@ def get_water_level(
             )
 
             logger.info(f"Water level found in file with value {h_a} m.")
+            rec = db_ops.add_water_level(session, timestamp, h_a)
         except Exception as e:
             message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
             device.message = message
             session.commit()
             raise ValueError(message)
-    return timestamp, h_a
+    return rec
 
 
 def create_task(
