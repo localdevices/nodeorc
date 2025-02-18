@@ -1,3 +1,11 @@
+## [0.2.3] - 2025-02-18
+### Added
+- Video database model has event listeners for removing media and attaching thumbnails
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
 
 ## [0.2.2] - 2025-02-14
 ### Added
