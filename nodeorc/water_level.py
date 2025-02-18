@@ -106,7 +106,7 @@ def execute_water_level_script(
     if script_type is None:
         script_type = "PYTHON"
     try:
-        if script_type.upper() == "PYTHON":
+        if "PYTHON" in str(script_type).upper():
             output = subprocess.run(
                 [sys.executable, "-c", script],
                 text=True,
@@ -120,7 +120,7 @@ def execute_water_level_script(
             )
         if output.returncode != 0:
             raise RuntimeError(f"Script execution failed: gives output {output.stderr} with output code {output.returncode}")
-        if script_type.upper() == "PYTHON":
+        if "PYTHON" in str(script_type).upper():
             last_line = output.stdout.strip().splitlines()[-1]
         else:
             last_line = output.stdout.decode(encoding="utf-8").strip().splitlines()[-1]
