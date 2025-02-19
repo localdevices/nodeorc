@@ -76,14 +76,14 @@ def test_get_water_level_from_db(session_config):
         )
         session_config.add(water_level_instance)
     session_config.commit()
-    timestamp, h_a = get_water_level(
+    rec = get_water_level(
         timestamp=timestamps[3] - timedelta(minutes=5),
         file_fmt="wl_{%Y%m%d}.txt",
         datetime_fmt="%Y%m%dT%H%M%SZ",
         allowed_dt=3600,
         session=session_config,
     )
-    assert h_a == values[3]
+    assert rec.h == values[3]
 
 
 def test_get_water_level_outside_dt(session_config, monkeypatch, mocker):
@@ -103,14 +103,14 @@ def test_get_water_level_outside_dt(session_config, monkeypatch, mocker):
     session_config.commit()
     monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_config)
     # now we select a timestamp that is close to but still outside of the range
-    timestamp, h_a = get_water_level(
+    rec = get_water_level(
         timestamp=timestamps[3] - timedelta(minutes=5),
         file_fmt="wl_{%Y%m%d}.txt",
         datetime_fmt="%Y%m%dT%H%M%SZ",
         allowed_dt=10,  # only ten seconds difference allowed.
         session=session_config,
     )
-    assert h_a == 3.5
+    assert rec.h == 3.5
 
 def test_get_water_level_file_not_available(session_config, monkeypatch):
 

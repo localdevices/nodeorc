@@ -15,7 +15,6 @@ import numpy as np
 
 from nodeorc.tasks import request_task_form
 from nodeorc import models, disk_mng, db, db_ops, utils, water_level, __home__
-from tests.test_cross_section import camera_config
 
 session = db_ops.get_session()
 device = session.query(db.Device).first()
@@ -533,7 +532,7 @@ def get_water_level(
     try:
         # first try to get water level from database
         rec = db_ops.get_water_level(session, timestamp, allowed_dt)
-        logger.info(f"Water level found in database at closest timestamp {timestamp} with value {h_a} m.")
+        logger.info(f"Water level found in database at closest timestamp {timestamp} with value {rec.h} m.")
     except Exception as db_ex:
         logger.warning(f"Failed to fetch water level from database at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Trying data file.")
         try:
@@ -547,6 +546,7 @@ def get_water_level(
 
             logger.info(f"Water level found in file with value {h_a} m.")
             rec = db_ops.add_water_level(session, timestamp, h_a)
+            session.commit()
         except Exception as e:
             message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
             device.message = message
