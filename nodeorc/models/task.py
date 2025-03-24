@@ -98,7 +98,6 @@ class Task(BaseModel):
             trg = os.path.join(tmp, file.tmp_name)
             # put the input file on tmp location
             self.storage.download_file(file.remote_name, trg, keep_src=keep_src)
-            # self.storage.bucket.download_file(file.remote_name, trg)
 
 
     def execute_subtasks(self, tmp, timestamp=None):

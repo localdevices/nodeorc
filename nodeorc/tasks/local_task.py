@@ -9,12 +9,15 @@ import sys
 import threading
 import time
 import uuid
+import xarray as xr
 from urllib.parse import urljoin
 
 import numpy as np
 
 from nodeorc.tasks import request_task_form
 from nodeorc import models, disk_mng, db, db_ops, utils, water_level, __home__
+
+from typing import Optional, List
 
 session = db_ops.get_session()
 device = session.query(db.Device).first()
@@ -160,8 +163,8 @@ class LocalTaskProcessor:
                     db_ops.add_water_level(session=session, timestamp=timestamp, level=level)
                     if single_task:
                         return timestamp, level
-                except Exception as e:
-                    self.logger.error(f"Error in retrieval of water levels: {e}")
+                except RuntimeError:
+                    self.logger.error(f"Error in retrieval of water levels, likely due to a connection problem.")
                 # sleep for configured amount of seconds
                 time.sleep(self.water_level_settings["frequency"])
             self.logger.info("Water level thread terminated.")
@@ -238,7 +241,6 @@ class LocalTaskProcessor:
         # before any processing, check for new task forms online
         self.get_new_task_form()
 
-
         task_uuid = uuid.uuid4()
         task_path = os.path.join(
             self.disk_management.tmp_path,
@@ -284,11 +286,6 @@ class LocalTaskProcessor:
                 url=os.path.join(__home__, "uploads", "videos", timestamp.strftime("%Y%m%d")),
                 bucket_name=str(video.id)
             )
-            #
-            # storage = models.Storage(
-            #     url=str(self.disk_management.results_path),
-            #     bucket_name=timestamp.strftime("%Y%m%d")
-            # )
             # move the file to the intended bucket
             if not(os.path.isdir(storage.bucket)):
                 os.makedirs(storage.bucket)
@@ -296,7 +293,6 @@ class LocalTaskProcessor:
             # update the location of the current path of the video file (only used in exception)
             cur_path = os.path.join(storage.bucket, filename)
             # collect water level
-            # timestamp_level, h_a = get_water_level(
             rec = get_water_level(
                 timestamp,
                 file_fmt=self.water_level_file_template,
@@ -304,8 +300,22 @@ class LocalTaskProcessor:
                 allowed_dt=self.settings.allowed_dt,
                 logger=self.logger
             )
-            # retrieve water level from time series record
-            h_a = rec.h
+            if rec is None:
+                message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}."
+                if self.water_level_settings["optical"]:
+                    self.logger.warning(message)
+                    self.logger.warning("Optical water level detection will be attempted.")
+                    h_a = None
+                else:
+                    device.message = message
+                    session.commit()
+                    self.logger.error(message)
+                    raise ValueError(message)
+
+            else:
+                # retrieve water level from time series record
+                h_a = rec.h
+
             # create the task object from all data
             task = create_task(
                 self.task_form_template,
@@ -315,6 +325,7 @@ class LocalTaskProcessor:
                 filename,
                 timestamp,
                 h_a,
+                self.water_level_settings["optical"],
                 logger=self.logger
             )
             # set cur_path to tmp location (only used on exception)
@@ -334,6 +345,19 @@ class LocalTaskProcessor:
             self._set_results_to_final_path(cur_path, storage.bucket, filename, task_path)
             # if the video was treated successfully, then store a record in the database
             rel_path_name = os.path.relpath(storage.bucket, os.path.join(__home__, "uploads"))
+            if rec is None:
+                # check if a water level was detected and store that
+                callback = task.callbacks[0]
+                fn = os.path.join(
+                    callback.storage.url,
+                    callback.storage.bucket_name,
+                    callback.file.remote_name
+                )
+                ds = xr.open_dataset(fn)
+                h_a = float(ds.h_a)
+                rec = db_ops.add_water_level(session, timestamp, h_a)
+                session.commit()
+
             video.time_series_id = rec.id,
             video.file = f"{rel_path_name}/{filename}"
             video.image = f"{rel_path_name}/{task.output_files['jpg'].remote_name}"
@@ -548,21 +572,20 @@ def get_water_level(
             rec = db_ops.add_water_level(session, timestamp, h_a)
             session.commit()
         except Exception as e:
-            message = f"Could not obtain a water level for date {timestamp.strftime('%Y%m%d')} at timestamp {timestamp.strftime('%Y%m%dT%H%M%S')}. Reason: {e}"
-            device.message = message
-            session.commit()
-            raise ValueError(message)
+            return None
+            # raise ValueError(message)
     return rec
 
 
 def create_task(
-    task_form_template,
-    task_uuid,
-    task_path,
-    storage,
-    filename,
-    timestamp,
-    h_a,
+    task_form_template : dict,
+    task_uuid: uuid.UUID,
+    task_path: str,
+    storage: models.Storage,
+    filename: str,
+    timestamp: datetime.datetime,
+    h_a: Optional[float] = None,
+    optical: bool = True,
     logger=logging
 ):
     """
@@ -583,6 +606,8 @@ def create_task(
         timestamp of video
     h_a : float
         actual water level during video
+    optical : bool
+        attempt to estimate water level optically from cross section, if not available
     logger : logging
         logger object
 
@@ -654,4 +679,12 @@ def create_task(
     task.subtasks[0].kwargs["h_a"] = h_a
     # replace output to a uuid-formed output path
     task.subtasks[0].kwargs["output"] = os.path.join(task_path, "OUTPUT")
+    # if water level settings have optical True, ensure the cross section is used to estimate water level
+    if optical:
+        # check if cross section is available
+        if "transect" in task.subtasks[0].kwargs["recipe"]:
+            if "transect_1" in task.subtasks[0].kwargs["recipe"]["transect"]:
+                if "geojson" in task.subtasks[0].kwargs["recipe"]["transect"]["transect_1"]:
+                    cross = task.subtasks[0].kwargs["recipe"]["transect"]["transect_1"]["geojson"]
+                    task.subtasks[0].kwargs["cross"] = cross
     return task
