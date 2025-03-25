@@ -15,8 +15,8 @@ class Settings(Base):
         Boolean,
         default=True,
         nullable=False,
-        comment="Flag determining if dates should be read from file metadata (True, default) or from a datestring in "
-                "the filename (False)"
+        comment="Flag determining if dates should be read from a datestring in the filename (True, default) or from "
+                "the file metadata (False)"
     )
     video_file_fmt = Column(
         String,
@@ -52,14 +52,22 @@ class Settings(Base):
 
     @validates("video_file_fmt")
     def check_video_fmt(cls, key, value):
+        if value.replace(" ", "") == "":
+            raise ValueError("video_file_fmt cannot be empty")
         # check string within {}, see if that can be parsed to datetime
-        check_datetime_fmt(value)
+        check_datetime_fmt(cls, value)
         return value
 
 
-def check_datetime_fmt(fn_fmt):
+def check_datetime_fmt(cls, fn_fmt):
     # check string within {}, see if that can be parsed to datetime
     if not("{" in fn_fmt and "}" in fn_fmt):
+        # there is no datestring in format, then cls.parse_dates_from_file MUST be False
+        if cls.parse_dates_from_file:
+            raise ValueError(
+                '{:s} does not contain a datetime format between {{""}} signs. Either set parse_dates_from_file to False '
+                'or provide a filename template with datetime format between {{""}}'.format(fn_fmt)
+            )
         return True
     try:
         fmt = fn_fmt.split('{')[1].split('}')[0]
