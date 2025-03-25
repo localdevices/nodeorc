@@ -83,7 +83,7 @@ class CallbackUrl(BaseModel):
         from .. import db_ops  # import lazily to avoid circular referencing
         from ..db import session  # import lazily to avoid circular referencing
 
-        callback_url = db_ops.get_callback_url()
+        callback_url = db_ops.get_callback_url(session)
         # update the tokens
         callback_url.token_access = self.token_access
         callback_url.token_refresh = self.token_refresh

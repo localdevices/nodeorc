@@ -42,7 +42,7 @@ class TimeSeries(RemoteBase):
     video = relationship("Video", uselist=False, back_populates="time_series")
 
     def __str__(self):
-        return "{}: {}".format(self.timestamp, self.level)
+        return "{}: {}".format(self.timestamp, self.h)
 
     def __repr__(self):
         return "{}".format(self.__str__())

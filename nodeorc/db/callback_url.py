@@ -21,7 +21,7 @@ class CallbackUrl(Base):
     token_refresh_end_point = Column(
         String,
         comment="Refresh end point for JWT tokens of the server",
-        default="/api/token/refresh"
+        default="/api/token/refresh/"
     )
     token_refresh = Column(
         String,
