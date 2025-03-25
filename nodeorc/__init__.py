@@ -1,6 +1,6 @@
 """NodeORC: Automated edge and cloud image-based discharge estimation with OpenRiverCam"""
 import os
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 __home__ = os.getenv("NODEORC_HOME")
 

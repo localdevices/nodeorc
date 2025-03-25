@@ -12,7 +12,7 @@ dependencies = [
     "dask[distributed]",
     "pika",
     "pydantic==2.3.0",
-    "pyopenrivercam>=0.8.4",
+    "pyopenrivercam>=0.8.5",
     "python-dotenv",
     "requests",
     "sqlalchemy"
