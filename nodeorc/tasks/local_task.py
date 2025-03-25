@@ -267,6 +267,7 @@ class LocalTaskProcessor:
                 message = f"Could not get a logical timestamp from file {file_path}. Reason: {e}"
                 device.message = message
                 session.commit()
+                self.logger.error(message)
                 raise ValueError(message)
                 # set message on device
             # create Storage instance
@@ -375,8 +376,9 @@ class LocalTaskProcessor:
             callback_success = False  # video was unsuccessful so callbacks are also not successful
             message = f"Error processing {file_path}: {str(e)}"
             device.message = message
-            video.status = db.VideoStatus.ERROR
-            session.commit()
+            if "video" in locals():
+                video.status = db.VideoStatus.ERROR
+                session.commit()
             self.logger.error(message)
             # find back the file and place in the failed location, organised per day
             if timestamp:
