@@ -3,7 +3,7 @@ import enum
 import re
 
 from datetime import datetime
-from sqlalchemy import event, Column, String, DateTime, Integer, Float, Enum
+from sqlalchemy import event, Boolean, Column, String, DateTime, Integer, Float, Enum
 from sqlalchemy.orm import validates
 
 from nodeorc import water_level
@@ -45,6 +45,12 @@ class WaterLevelSettings(Base):
         default="print(\"2000-01-01T00:00:00Z, 10\")",
         comment="Content of the script to be executed to retrieve water level data from the device or API. Script must "
                 "print a water level value to stdout in the form \"%Y-%m-%dT%H:%M:%SZ, <value>\""
+    )
+    optical = Column(
+        Boolean,
+        default=True,
+        comment="Whether to measure water level optically if no water level can be retrieved from the database or "
+                "files. "
     )
     def __str__(self):
         return "WaterLevel: {} ({})".format(self.created_at, self.id)

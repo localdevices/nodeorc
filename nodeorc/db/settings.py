@@ -44,6 +44,13 @@ class Settings(Base):
         nullable=False,
         comment="Float indicating the amount of seconds after which device reboots (0 means never reboot)"
     )
+    enable_daemon = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+        comment="Flag for enabling the daemon. If disabled, the daemon will not be started and the service will "
+                "only run in the foreground."
+    )
     def __str__(self):
         return "Settings {} ({})".format(self.created_at, self.id)
 

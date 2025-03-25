@@ -1,3 +1,13 @@
+## [0.2.4] - 2025-03-25
+### Added
+### Changed
+- Water levels can be optically obtained if the user sets a flag for this (default: True)
+  This requires pyopenrivercam>=0.8.5
+### Deprecated
+### Removed
+### Fixed
+### Security
+
 ## [0.2.3] - 2025-02-18
 ### Added
 - Video database model has event listeners for removing media and attaching thumbnails

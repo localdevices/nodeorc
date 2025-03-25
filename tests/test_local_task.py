@@ -127,14 +127,16 @@ def test_get_water_level_file_not_available(session_config, monkeypatch):
     session_config.commit()
     monkeypatch.setattr("nodeorc.db_ops.get_session", lambda: session_config)
     # now we select a timestamp that is close to but still outside of the range
-    with pytest.raises(ValueError, match="Could not obtain a water level for date"):
-        _ = get_water_level(
-            timestamp=timestamps[3] - timedelta(minutes=5),
-            file_fmt="wl_{%Y%m%d}.txt",
-            datetime_fmt="%Y%m%dT%H%M%SZ",
-            allowed_dt=10,  # only ten seconds difference allowed.
-            session=session_config,
-        )
+    rec = get_water_level(
+        timestamp=timestamps[3] - timedelta(minutes=5),
+        file_fmt="wl_{%Y%m%d}.txt",
+        datetime_fmt="%Y%m%dT%H%M%SZ",
+        allowed_dt=10,  # only ten seconds difference allowed.
+        session=session_config,
+    )
+    # rec should be None
+    assert rec is None
+
 
 def test_cleanup_enough_space(local_task_processor):
     # only test if the function returns true if the free space is above minimum required space.
